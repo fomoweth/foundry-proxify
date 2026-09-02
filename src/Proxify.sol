@@ -555,35 +555,116 @@ library Proxify {
                                 ERC1967 INSPECTION
     //////////////////////////////////////////////////////////////////////////*/
 
+    /// @notice Returns the address stored in an ERC1967 implementation slot.
+    /// @dev Performs a raw storage read through Foundry and does not validate
+    ///      either the target or the stored address.
+    /// @param proxy The address whose ERC1967 implementation slot is read.
+    /// @return implementation The address encoded in the implementation slot.
     function getImplementation(address proxy) internal view returns (address implementation) {
         return address(uint160(uint256(vm.load(proxy, IMPLEMENTATION_SLOT))));
     }
 
+    /// @notice Returns the address stored in an ERC1967 admin slot.
+    /// @dev Performs a raw storage read and does not prove that the
+    ///      stored address represents operative administrative authority.
+    /// @param proxy The address whose ERC1967 admin slot is read.
+    /// @return admin The address encoded in the admin slot.
     function getAdmin(address proxy) internal view returns (address admin) {
         return address(uint160(uint256(vm.load(proxy, ADMIN_SLOT))));
     }
 
+    /// @notice Returns the address stored in an ERC1967 beacon slot.
+    /// @dev Performs a raw storage read and does not prove that the
+    ///      target dynamically consults the stored beacon.
+    /// @param proxy The address whose ERC1967 beacon slot is read.
+    /// @return beacon The address encoded in the beacon slot.
     function getBeacon(address proxy) internal view returns (address beacon) {
         return address(uint160(uint256(vm.load(proxy, BEACON_SLOT))));
     }
 
-    function getBeaconImplementation(address beacon) internal view returns (address implementation) {}
+    /// @notice Returns the implementation address reported by a beacon.
+    /// @dev Calls `implementation()` on the beacon and bubbles downstream revert data on failure.
+    /// @param beacon The beacon whose implementation getter is called.
+    /// @return implementation The implementation address reported by the beacon.
+    function getBeaconImplementation(address beacon) internal view returns (address implementation) {
+        assembly ("memory-safe") {
+            mstore(0x00, 0x5c60da1b) // implementation()
 
-    function getUpgradeInterfaceVersion(address upgradeInterface) internal view returns (string memory version) {}
+            if iszero(staticcall(gas(), beacon, 0x1c, 0x04, 0x00, 0x20)) {
+                let ptr := mload(0x40)
+                returndatacopy(ptr, 0x00, returndatasize())
+                revert(ptr, returndatasize())
+            }
+
+            implementation := mload(0x00)
+        }
+    }
+
+    /// @notice Returns the upgrade interface version reported by an upgrade interface contract.
+    /// @dev Calls `UPGRADE_INTERFACE_VERSION()` and returns the decoded version string when the
+    ///      response has the expected ABI layout. Returns an empty string otherwise.
+    /// @param upgradeInterface The address whose upgrade interface version getter is called.
+    /// @return version The upgrade interface version reported by the contract.
+    function getUpgradeInterfaceVersion(address upgradeInterface) internal view returns (string memory version) {
+        assembly ("memory-safe") {
+            mstore(0x00, 0xad3cb1cc) // UPGRADE_INTERFACE_VERSION()
+
+            if and(eq(returndatasize(), 0x60), staticcall(gas(), upgradeInterface, 0x1c, 0x04, 0x00, 0x00)) {
+                let ptr := mload(0x40)
+                mstore(0x40, add(ptr, 0x60))
+                returndatacopy(ptr, 0x00, 0x60)
+
+                if and(eq(mload(ptr), 0x20), iszero(gt(mload(add(ptr, 0x20)), 0x20))) {
+                    version := add(ptr, 0x20)
+                }
+            }
+        }
+    }
 
     /*//////////////////////////////////////////////////////////////////////////
                                     VALIDATION
     //////////////////////////////////////////////////////////////////////////*/
 
-    function validateImplementation(address proxy, address expected) internal view {}
+    /// @notice Verifies that an ERC1967 implementation slot contains an expected address.
+    /// @param proxy The proxy whose implementation slot is inspected.
+    /// @param expected The expected implementation address.
+    function validateImplementation(address proxy, address expected) internal view {
+        address actual = getImplementation(proxy);
+        if (actual != expected) revert ImplementationMismatch(proxy, expected, actual);
+    }
 
-    function validateAdmin(address proxy, address expected) internal view {}
+    /// @notice Verifies that an ERC1967 admin slot contains an expected address.
+    /// @param proxy The proxy whose admin slot is inspected.
+    /// @param expected The expected admin address.
+    function validateAdmin(address proxy, address expected) internal view {
+        address actual = getAdmin(proxy);
+        if (actual != expected) revert AdminMismatch(proxy, expected, actual);
+    }
 
-    function validateBeacon(address proxy, address expected) internal view {}
+    /// @notice Verifies that an ERC1967 beacon slot contains an expected address.
+    /// @param proxy The proxy whose beacon slot is inspected.
+    /// @param expected The expected beacon address.
+    function validateBeacon(address proxy, address expected) internal view {
+        address actual = getBeacon(proxy);
+        if (actual != expected) revert BeaconMismatch(proxy, expected, actual);
+    }
 
-    function validateBeaconImplementation(address beacon, address expected) internal view {}
+    /// @notice Verifies that a beacon reports an expected implementation address.
+    /// @param beacon The beacon whose implementation is inspected.
+    /// @param expected The expected implementation address.
+    function validateBeaconImplementation(address beacon, address expected) internal view {
+        address actual = getBeaconImplementation(beacon);
+        if (actual != expected) revert BeaconImplementationMismatch(beacon, expected, actual);
+    }
 
-    function validateOwner(address target, address expected) internal view {}
+    /// @notice Verifies that an ownable contract reports an expected owner.
+    /// @dev Calls the target's `owner()` getter and compares the returned address.
+    /// @param target The ownable contract whose owner is inspected.
+    /// @param expected The expected owner address.
+    function validateOwner(address target, address expected) internal view {
+        address actual = _getOwner(target);
+        if (actual != expected) revert OwnerMismatch(target, expected, actual);
+    }
 
     /*//////////////////////////////////////////////////////////////////////////
                                 PRIVATE INTERNALS
@@ -626,5 +707,33 @@ library Proxify {
 
     function _upgradeBeaconTo(address beacon, address implementation) private {}
 
-    function _getOwner(address target) private view returns (address owner) {}
+    /// @dev Returns the owner reported by an ownable contract.
+    ///      Calls `owner()` and bubbles downstream revert data on failure.
+    /// @param target The contract whose owner getter is called.
+    /// @return owner The owner address reported by the target.
+    function _getOwner(address target) private view returns (address owner) {
+        assembly ("memory-safe") {
+            mstore(0x00, 0x8da5cb5b) // owner()
+
+            if iszero(staticcall(gas(), target, 0x1c, 0x04, 0x00, 0x20)) {
+                let ptr := mload(0x40)
+                returndatacopy(ptr, 0x00, returndatasize())
+                revert(ptr, returndatasize())
+            }
+
+            owner := mload(0x00)
+        }
+    }
+
+    /// @dev Reverts if a target contains no runtime code.
+    /// @param target The address expected to contain runtime code.
+    function _requireCode(address target) private view {
+        assembly ("memory-safe") {
+            if iszero(extcodesize(target)) {
+                mstore(0x00, 0x626c4161) // EmptyCode(address)
+                mstore(0x20, shr(0x60, shl(0x60, target)))
+                revert(0x1c, 0x24)
+            }
+        }
+    }
 }
