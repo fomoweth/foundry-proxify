@@ -7,8 +7,6 @@ import {ProxifyTestBase} from "test/Base.t.sol";
 contract ProxifyUpgradeBeaconTest is ProxifyTestBase {
     string internal constant defaultGreeting = "hello";
     address internal constant defaultOwner = 0xDeaDbeefdEAdbeefdEadbEEFdeadbeEFdEaDbeeF;
-    uint256 internal constant defaultNumber = 42;
-    uint256 internal constant defaultValue = 12 ether;
     bytes32 internal constant defaultSalt = keccak256("proxify-upgradeBeacon-salt");
 
     address internal proxy;
