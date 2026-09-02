@@ -1017,97 +1017,313 @@ library Proxify {
                                     BEACON PROXY
     //////////////////////////////////////////////////////////////////////////*/
 
-    function deployBeacon(address implementation, address initialOwner) internal returns (address beacon) {}
+    /// @notice Deploys an upgradeable beacon backed by an existing implementation.
+    /// @dev Deploys an OpenZeppelin Contracts v5-compatible UpgradeableBeacon using CREATE,
+    ///      then verifies its owner and reported implementation.
+    /// @param implementation The initial implementation address.
+    /// @param initialOwner The initial beacon owner.
+    /// @return beacon The deployed beacon address.
+    function deployBeacon(address implementation, address initialOwner) internal returns (address beacon) {
+        beacon = deployCode({
+            artifactPath: "UpgradeableBeacon.sol:UpgradeableBeacon",
+            constructorArgs: abi.encode(implementation, initialOwner)
+        });
+        validateOwner(beacon, initialOwner);
+        validateBeaconImplementation(beacon, implementation);
+    }
 
+    /// @notice Deploys an upgradeable beacon deterministically around an existing implementation.
+    /// @dev Deploys an OpenZeppelin Contracts v5-compatible UpgradeableBeacon using CREATE2,
+    ///      then verifies its owner and reported implementation.
+    /// @param implementation The initial implementation address.
+    /// @param initialOwner The initial beacon owner.
+    /// @param salt The CREATE2 deployment salt.
+    /// @return beacon The deployed beacon address.
     function deployBeacon(address implementation, address initialOwner, bytes32 salt)
         internal
         returns (address beacon)
-    {}
+    {
+        beacon = deployCode({
+            artifactPath: "UpgradeableBeacon.sol:UpgradeableBeacon",
+            constructorArgs: abi.encode(implementation, initialOwner),
+            salt: salt
+        });
+        validateOwner(beacon, initialOwner);
+        validateBeaconImplementation(beacon, implementation);
+    }
 
-    function deployBeacon(string memory artifactPath, address initialOwner) internal returns (address beacon) {}
+    /// @notice Deploys an implementation from an artifact and creates an upgradeable beacon backed by it.
+    /// @dev Deploys the implementation and beacon using CREATE.
+    /// @param artifactPath The Foundry artifact identifier for the implementation contract.
+    /// @param initialOwner The initial beacon owner.
+    /// @return beacon The deployed beacon address.
+    function deployBeacon(string memory artifactPath, address initialOwner) internal returns (address beacon) {
+        return deployBeacon(deployCode(artifactPath), initialOwner);
+    }
 
+    /// @notice Deploys an implementation from an artifact and creates an upgradeable beacon backed by it.
+    /// @dev Deploys the implementation and beacon using CREATE.
+    /// @param artifactPath The Foundry artifact identifier for the implementation contract.
+    /// @param constructorArgs The ABI-encoded implementation constructor arguments.
+    /// @param initialOwner The initial beacon owner.
+    /// @return beacon The deployed beacon address.
     function deployBeacon(string memory artifactPath, bytes memory constructorArgs, address initialOwner)
         internal
         returns (address beacon)
-    {}
+    {
+        return deployBeacon(deployCode(artifactPath, constructorArgs), initialOwner);
+    }
 
+    /// @notice Deploys an implementation and upgradeable beacon deterministically using a shared CREATE2 salt.
+    /// @dev Uses the same salt for both implementation and beacon deployment.
+    /// @param artifactPath The Foundry artifact identifier for the implementation contract.
+    /// @param initialOwner The initial beacon owner.
+    /// @param salt The CREATE2 deployment salt used for both deployments.
+    /// @return beacon The deployed beacon address.
     function deployBeacon(string memory artifactPath, address initialOwner, bytes32 salt)
         internal
         returns (address beacon)
-    {}
+    {
+        return deployBeacon(deployCode(artifactPath, salt), initialOwner, salt);
+    }
 
+    /// @notice Deploys an implementation and upgradeable beacon deterministically using a shared CREATE2 salt.
+    /// @dev Uses the same salt for both implementation and beacon deployment.
+    /// @param artifactPath The Foundry artifact identifier for the implementation contract.
+    /// @param constructorArgs The ABI-encoded implementation constructor arguments.
+    /// @param initialOwner The initial beacon owner.
+    /// @param salt The CREATE2 deployment salt used for both deployments.
+    /// @return beacon The deployed beacon address.
     function deployBeacon(string memory artifactPath, bytes memory constructorArgs, address initialOwner, bytes32 salt)
         internal
         returns (address beacon)
-    {}
+    {
+        return deployBeacon(deployCode(artifactPath, constructorArgs, salt), initialOwner, salt);
+    }
 
-    function deployBeaconProxy(address beacon, bytes memory initializerData) internal returns (address proxy) {}
+    /// @notice Deploys a beacon proxy backed by an existing beacon.
+    /// @dev Deploys an OpenZeppelin Contracts v5-compatible BeaconProxy using CREATE and verifies
+    ///      the resulting ERC1967 beacon slot.
+    /// @param beacon The beacon address used by the proxy.
+    /// @param initializerData Complete initialization calldata executed during proxy construction.
+    /// @return proxy The deployed beacon proxy address.
+    function deployBeaconProxy(address beacon, bytes memory initializerData) internal returns (address proxy) {
+        return deployBeaconProxy({beacon: beacon, initializerData: initializerData, value: 0});
+    }
 
+    /// @notice Deploys a beacon proxy backed by an existing beacon and forwards Ether during initialization.
+    /// @dev Deploys an OpenZeppelin Contracts v5-compatible BeaconProxy using CREATE and verifies
+    ///      the resulting ERC1967 beacon slot.
+    /// @param beacon The beacon address used by the proxy.
+    /// @param initializerData Complete initialization calldata executed during proxy construction.
+    /// @param value The amount of Ether forwarded during proxy construction.
+    /// @return proxy The deployed beacon proxy address.
     function deployBeaconProxy(address beacon, bytes memory initializerData, uint256 value)
         internal
         returns (address proxy)
-    {}
+    {
+        proxy = deployCode({
+            artifactPath: "BeaconProxy.sol:BeaconProxy",
+            constructorArgs: abi.encode(beacon, initializerData),
+            value: value
+        });
+        validateBeacon(proxy, beacon);
+    }
 
+    /// @notice Deploys a beacon proxy deterministically around an existing beacon.
+    /// @dev Deploys an OpenZeppelin Contracts v5-compatible BeaconProxy using CREATE2 and verifies
+    ///      the resulting ERC1967 beacon slot.
+    /// @param beacon The beacon address used by the proxy.
+    /// @param initializerData Complete initialization calldata executed during proxy construction.
+    /// @param salt The CREATE2 deployment salt.
+    /// @return proxy The deployed beacon proxy address.
     function deployBeaconProxy(address beacon, bytes memory initializerData, bytes32 salt)
         internal
         returns (address proxy)
-    {}
+    {
+        return deployBeaconProxy({beacon: beacon, initializerData: initializerData, salt: salt, value: 0});
+    }
 
+    /// @notice Deploys a beacon proxy deterministically around an existing beacon and forwards Ether.
+    /// @dev Deploys an OpenZeppelin Contracts v5-compatible BeaconProxy using CREATE2 and verifies
+    ///      the resulting ERC1967 beacon slot.
+    /// @param beacon The beacon address used by the proxy.
+    /// @param initializerData Complete initialization calldata executed during proxy construction.
+    /// @param salt The CREATE2 deployment salt.
+    /// @param value The amount of Ether forwarded during proxy construction.
+    /// @return proxy The deployed beacon proxy address.
     function deployBeaconProxy(address beacon, bytes memory initializerData, bytes32 salt, uint256 value)
         internal
         returns (address proxy)
-    {}
+    {
+        proxy = deployCode({
+            artifactPath: "BeaconProxy.sol:BeaconProxy",
+            constructorArgs: abi.encode(beacon, initializerData),
+            salt: salt,
+            value: value
+        });
+        validateBeacon(proxy, beacon);
+    }
 
+    /// @notice Deploys an implementation, upgradeable beacon, and beacon proxy from an artifact.
+    /// @dev Deploys all three contracts using CREATE.
+    /// @param artifactPath The Foundry artifact identifier for the implementation contract.
+    /// @param initialOwner The initial beacon owner.
+    /// @param initializerData Complete initialization calldata executed during beacon proxy construction.
+    /// @return proxy The deployed beacon proxy address.
     function deployBeaconProxy(string memory artifactPath, address initialOwner, bytes memory initializerData)
         internal
         returns (address proxy)
-    {}
+    {
+        return deployBeaconProxy({
+            artifactPath: artifactPath, initialOwner: initialOwner, initializerData: initializerData, value: 0
+        });
+    }
 
+    /// @notice Deploys an implementation, upgradeable beacon, and beacon proxy and forwards Ether during initialization.
+    /// @dev Deploys all three contracts using CREATE and forwards Ether only during beacon proxy construction.
+    /// @param artifactPath The Foundry artifact identifier for the implementation contract.
+    /// @param initialOwner The initial beacon owner.
+    /// @param initializerData Complete initialization calldata executed during beacon proxy construction.
+    /// @param value The amount of Ether forwarded during beacon proxy construction.
+    /// @return proxy The deployed beacon proxy address.
     function deployBeaconProxy(
         string memory artifactPath,
         address initialOwner,
         bytes memory initializerData,
         uint256 value
-    ) internal returns (address proxy) {}
+    ) internal returns (address proxy) {
+        return deployBeaconProxy({
+            beacon: deployBeacon(deployCode(artifactPath), initialOwner), initializerData: initializerData, value: value
+        });
+    }
 
+    /// @notice Deploys an implementation, upgradeable beacon, and beacon proxy from an artifact.
+    /// @dev Deploys all three contracts using CREATE. Ether, when present in another overload,
+    ///      is forwarded only during beacon proxy construction.
+    /// @param artifactPath The Foundry artifact identifier for the implementation contract.
+    /// @param constructorArgs The ABI-encoded implementation constructor arguments.
+    /// @param initialOwner The initial beacon owner.
+    /// @param initializerData Complete initialization calldata executed during beacon proxy construction.
+    /// @return proxy The deployed beacon proxy address.
     function deployBeaconProxy(
         string memory artifactPath,
         bytes memory constructorArgs,
         address initialOwner,
         bytes memory initializerData
-    ) internal returns (address proxy) {}
+    ) internal returns (address proxy) {
+        return deployBeaconProxy({
+            artifactPath: artifactPath,
+            constructorArgs: constructorArgs,
+            initialOwner: initialOwner,
+            initializerData: initializerData,
+            value: 0
+        });
+    }
 
+    /// @notice Deploys an implementation, upgradeable beacon, and beacon proxy and forwards Ether during initialization.
+    /// @dev Deploys all three contracts using CREATE and forwards Ether only during beacon proxy construction.
+    /// @param artifactPath The Foundry artifact identifier for the implementation contract.
+    /// @param constructorArgs The ABI-encoded implementation constructor arguments.
+    /// @param initialOwner The initial beacon owner.
+    /// @param initializerData Complete initialization calldata executed during beacon proxy construction.
+    /// @param value The amount of Ether forwarded during beacon proxy construction.
+    /// @return proxy The deployed beacon proxy address.
     function deployBeaconProxy(
         string memory artifactPath,
         bytes memory constructorArgs,
         address initialOwner,
         bytes memory initializerData,
         uint256 value
-    ) internal returns (address proxy) {}
+    ) internal returns (address proxy) {
+        return deployBeaconProxy({
+            beacon: deployBeacon(deployCode(artifactPath, constructorArgs), initialOwner),
+            initializerData: initializerData,
+            value: value
+        });
+    }
 
+    /// @notice Deploys an implementation, upgradeable beacon, and beacon proxy deterministically using a shared salt.
+    /// @dev Uses the same CREATE2 salt for all three deployments.
+    /// @param artifactPath The Foundry artifact identifier for the implementation contract.
+    /// @param initialOwner The initial beacon owner.
+    /// @param initializerData Complete initialization calldata executed during beacon proxy construction.
+    /// @param salt The CREATE2 deployment salt used for implementation, beacon, and proxy deployment.
+    /// @return proxy The deployed beacon proxy address.
     function deployBeaconProxy(
         string memory artifactPath,
         address initialOwner,
         bytes memory initializerData,
         bytes32 salt
-    ) internal returns (address proxy) {}
+    ) internal returns (address proxy) {
+        return deployBeaconProxy({
+            artifactPath: artifactPath,
+            initialOwner: initialOwner,
+            initializerData: initializerData,
+            salt: salt,
+            value: 0
+        });
+    }
 
+    /// @notice Deploys an implementation, upgradeable beacon, and beacon proxy deterministically and forwards Ether.
+    /// @dev Uses the same CREATE2 salt for all three deployments and forwards Ether only during
+    ///      beacon proxy construction.
+    /// @param artifactPath The Foundry artifact identifier for the implementation contract.
+    /// @param initialOwner The initial beacon owner.
+    /// @param initializerData Complete initialization calldata executed during beacon proxy construction.
+    /// @param salt The CREATE2 deployment salt used for implementation, beacon, and proxy deployment.
+    /// @param value The amount of Ether forwarded during beacon proxy construction.
+    /// @return proxy The deployed beacon proxy address.
     function deployBeaconProxy(
         string memory artifactPath,
         address initialOwner,
         bytes memory initializerData,
         bytes32 salt,
         uint256 value
-    ) internal returns (address proxy) {}
+    ) internal returns (address proxy) {
+        return deployBeaconProxy({
+            beacon: deployBeacon(deployCode(artifactPath, salt), initialOwner, salt),
+            initializerData: initializerData,
+            salt: salt,
+            value: value
+        });
+    }
 
+    /// @notice Deploys an implementation, upgradeable beacon, and beacon proxy deterministically using a shared salt.
+    /// @dev Uses the same CREATE2 salt for all three deployments.
+    /// @param artifactPath The Foundry artifact identifier for the implementation contract.
+    /// @param constructorArgs The ABI-encoded implementation constructor arguments.
+    /// @param initialOwner The initial beacon owner.
+    /// @param initializerData Complete initialization calldata executed during beacon proxy construction.
+    /// @param salt The CREATE2 deployment salt used for implementation, beacon, and proxy deployment.
+    /// @return proxy The deployed beacon proxy address.
     function deployBeaconProxy(
         string memory artifactPath,
         bytes memory constructorArgs,
         address initialOwner,
         bytes memory initializerData,
         bytes32 salt
-    ) internal returns (address proxy) {}
+    ) internal returns (address proxy) {
+        return deployBeaconProxy({
+            artifactPath: artifactPath,
+            constructorArgs: constructorArgs,
+            initialOwner: initialOwner,
+            initializerData: initializerData,
+            salt: salt,
+            value: 0
+        });
+    }
 
+    /// @notice Deploys an implementation, upgradeable beacon, and beacon proxy deterministically and forwards Ether.
+    /// @dev Uses the same CREATE2 salt for all three deployments and forwards Ether only during
+    ///      beacon proxy construction.
+    /// @param artifactPath The Foundry artifact identifier for the implementation contract.
+    /// @param constructorArgs The ABI-encoded implementation constructor arguments.
+    /// @param initialOwner The initial beacon owner.
+    /// @param initializerData Complete initialization calldata executed during beacon proxy construction.
+    /// @param salt The CREATE2 deployment salt used for implementation, beacon, and proxy deployment.
+    /// @param value The amount of Ether forwarded during beacon proxy construction.
+    /// @return proxy The deployed beacon proxy address.
     function deployBeaconProxy(
         string memory artifactPath,
         bytes memory constructorArgs,
@@ -1115,18 +1331,63 @@ library Proxify {
         bytes memory initializerData,
         bytes32 salt,
         uint256 value
-    ) internal returns (address proxy) {}
+    ) internal returns (address proxy) {
+        return deployBeaconProxy({
+            beacon: deployBeacon(deployCode(artifactPath, constructorArgs, salt), initialOwner, salt),
+            initializerData: initializerData,
+            salt: salt,
+            value: value
+        });
+    }
 
-    function upgradeBeacon(address beacon, address implementation) internal {}
+    /// @notice Upgrades an existing beacon to a new implementation.
+    /// @dev Calls the OpenZeppelin Contracts v5-compatible `upgradeTo(address)` entry point and verifies
+    ///      the implementation subsequently reported by the beacon.
+    /// @param beacon The beacon to upgrade.
+    /// @param implementation The new implementation address.
+    function upgradeBeacon(address beacon, address implementation) internal {
+        _requireCode(beacon);
+        _upgradeBeaconTo(beacon, implementation);
+        validateBeaconImplementation(beacon, implementation);
+    }
 
-    function upgradeBeacon(address beacon, string memory artifactPath) internal {}
+    /// @notice Deploys a new implementation from an artifact and upgrades an existing beacon to it.
+    /// @dev Deploys the implementation using CREATE before invoking the beacon upgrade.
+    /// @param beacon The beacon to upgrade.
+    /// @param artifactPath The Foundry artifact identifier for the new implementation contract.
+    function upgradeBeacon(address beacon, string memory artifactPath) internal {
+        upgradeBeacon({beacon: beacon, implementation: deployCode(artifactPath)});
+    }
 
-    function upgradeBeacon(address beacon, string memory artifactPath, bytes memory constructorArgs) internal {}
+    /// @notice Deploys a new implementation from an artifact and upgrades an existing beacon to it.
+    /// @dev Deploys the implementation using CREATE before invoking the beacon upgrade.
+    /// @param beacon The beacon to upgrade.
+    /// @param artifactPath The Foundry artifact identifier for the new implementation contract.
+    /// @param constructorArgs The ABI-encoded implementation constructor arguments.
+    function upgradeBeacon(address beacon, string memory artifactPath, bytes memory constructorArgs) internal {
+        upgradeBeacon({beacon: beacon, implementation: deployCode(artifactPath, constructorArgs)});
+    }
 
-    function upgradeBeacon(address beacon, string memory artifactPath, bytes32 salt) internal {}
+    /// @notice Deploys a new implementation deterministically and upgrades an existing beacon to it.
+    /// @dev Deploys the implementation using CREATE2 before invoking the beacon upgrade.
+    /// @param beacon The beacon to upgrade.
+    /// @param artifactPath The Foundry artifact identifier for the new implementation contract.
+    /// @param salt The CREATE2 deployment salt used for the new implementation.
+    function upgradeBeacon(address beacon, string memory artifactPath, bytes32 salt) internal {
+        upgradeBeacon({beacon: beacon, implementation: deployCode(artifactPath, salt)});
+    }
 
+    /// @notice Deploys a new implementation deterministically and upgrades an existing beacon to it.
+    /// @dev Deploys the implementation using CREATE2 before invoking the beacon upgrade.
+    /// @param beacon The beacon to upgrade.
+    /// @param artifactPath The Foundry artifact identifier for the new implementation contract.
+    /// @param constructorArgs The ABI-encoded implementation constructor arguments.
+    /// @param salt The CREATE2 deployment salt used for the new implementation.
     function upgradeBeacon(address beacon, string memory artifactPath, bytes memory constructorArgs, bytes32 salt)
-        internal {}
+        internal
+    {
+        upgradeBeacon({beacon: beacon, implementation: deployCode(artifactPath, constructorArgs, salt)});
+    }
 
     /*//////////////////////////////////////////////////////////////////////////
                                 ERC1967 INSPECTION
@@ -1337,7 +1598,27 @@ library Proxify {
         }
     }
 
-    function _upgradeBeaconTo(address beacon, address implementation) private {}
+    /// @dev Calls an OpenZeppelin Contracts v5-compatible beacon `upgradeTo(address)` entry point.
+    ///      Bubbles downstream revert data when available and reverts with {UpgradeFailed} when the call fails without revert data.
+    /// @param beacon The beacon receiving the upgrade call.
+    /// @param implementation The new implementation address.
+    function _upgradeBeaconTo(address beacon, address implementation) private {
+        assembly ("memory-safe") {
+            mstore(0x00, 0x3659cfe6) // upgradeTo(address)
+            mstore(0x20, shr(0x60, shl(0x60, implementation)))
+
+            if iszero(call(gas(), beacon, 0x00, 0x1c, 0x24, 0x00, 0x00)) {
+                if iszero(returndatasize()) {
+                    mstore(0x00, 0x55299b49) // UpgradeFailed()
+                    revert(0x1c, 0x04)
+                }
+
+                let ptr := mload(0x40)
+                returndatacopy(ptr, 0x00, returndatasize())
+                revert(ptr, returndatasize())
+            }
+        }
+    }
 
     /// @dev Returns the owner reported by an ownable contract.
     ///      Calls `owner()` and bubbles downstream revert data on failure.
