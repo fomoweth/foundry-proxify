@@ -18,7 +18,7 @@ contract ProxifyDeployCodeTest is ProxifyTestBase {
 
     uint256 internal constant defaultValue = 12 ether;
 
-    bytes32 internal constant defaultSalt = keccak256("proxify-test-salt");
+    bytes32 internal constant defaultSalt = keccak256("proxify-deployCode-salt");
 
     function test_deployCode_create() public {
         address instance = Proxify.deployCode(OBSERVER_NO_ARGS_PATH);

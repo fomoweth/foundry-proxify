@@ -167,114 +167,370 @@ library Proxify {
                                     UUPS PROXY
     //////////////////////////////////////////////////////////////////////////*/
 
-    function deployUUPSProxy(address implementation, bytes memory initializerData) internal returns (address proxy) {}
+    /// @notice Deploys a UUPS proxy backed by an existing implementation.
+    /// @dev Deploys an OpenZeppelin Contracts v5-compatible ERC1967 proxy using CREATE and verifies
+    ///      the resulting ERC1967 implementation slot. This function does not independently verify
+    ///      that the initial implementation exposes a valid UUPS upgrade mechanism.
+    /// @param implementation The initial implementation address.
+    /// @param initializerData Complete initialization calldata executed during proxy construction.
+    /// @return proxy The deployed proxy address.
+    function deployUUPSProxy(address implementation, bytes memory initializerData) internal returns (address proxy) {
+        return deployUUPSProxy({implementation: implementation, initializerData: initializerData, value: 0});
+    }
 
+    /// @notice Deploys a UUPS proxy backed by an existing implementation and forwards Ether during initialization.
+    /// @dev Deploys an OpenZeppelin Contracts v5-compatible ERC1967 proxy using CREATE and verifies
+    ///      the resulting ERC1967 implementation slot. This function does not independently verify
+    ///      that the initial implementation exposes a valid UUPS upgrade mechanism.
+    /// @param implementation The initial implementation address.
+    /// @param initializerData Complete initialization calldata executed during proxy construction.
+    /// @param value The amount of Ether forwarded during proxy construction.
+    /// @return proxy The deployed proxy address.
     function deployUUPSProxy(address implementation, bytes memory initializerData, uint256 value)
         internal
         returns (address proxy)
-    {}
+    {
+        proxy = deployCode({
+            artifactPath: "ERC1967Proxy.sol:ERC1967Proxy",
+            constructorArgs: abi.encode(implementation, initializerData),
+            value: value
+        });
+        validateImplementation(proxy, implementation);
+    }
 
+    /// @notice Deploys a UUPS proxy deterministically around an existing implementation.
+    /// @dev Deploys an OpenZeppelin Contracts v5-compatible ERC1967 proxy using CREATE2 and verifies
+    ///      the resulting ERC1967 implementation slot.
+    /// @param implementation The initial implementation address.
+    /// @param initializerData Complete initialization calldata executed during proxy construction.
+    /// @param salt The CREATE2 deployment salt.
+    /// @return proxy The deployed proxy address.
     function deployUUPSProxy(address implementation, bytes memory initializerData, bytes32 salt)
         internal
         returns (address proxy)
-    {}
+    {
+        return deployUUPSProxy({implementation: implementation, initializerData: initializerData, salt: salt, value: 0});
+    }
 
+    /// @notice Deploys a UUPS proxy deterministically around an existing implementation and forwards Ether.
+    /// @dev Deploys an OpenZeppelin Contracts v5-compatible ERC1967 proxy using CREATE2 and verifies
+    ///      the resulting ERC1967 implementation slot.
+    /// @param implementation The initial implementation address.
+    /// @param initializerData Complete initialization calldata executed during proxy construction.
+    /// @param salt The CREATE2 deployment salt.
+    /// @param value The amount of Ether forwarded during proxy construction.
+    /// @return proxy The deployed proxy address.
     function deployUUPSProxy(address implementation, bytes memory initializerData, bytes32 salt, uint256 value)
         internal
         returns (address proxy)
-    {}
+    {
+        proxy = deployCode({
+            artifactPath: "ERC1967Proxy.sol:ERC1967Proxy",
+            constructorArgs: abi.encode(implementation, initializerData),
+            salt: salt,
+            value: value
+        });
+        validateImplementation(proxy, implementation);
+    }
 
+    /// @notice Deploys an implementation from an artifact and creates a UUPS proxy backed by it.
+    /// @dev Deploys the implementation using CREATE, then deploys an OpenZeppelin Contracts
+    ///      v5-compatible ERC1967 proxy using CREATE.
+    /// @param artifactPath The Foundry artifact identifier for the implementation contract.
+    /// @param initializerData Complete initialization calldata executed during proxy construction.
+    /// @return proxy The deployed proxy address.
     function deployUUPSProxy(string memory artifactPath, bytes memory initializerData)
         internal
         returns (address proxy)
-    {}
+    {
+        return deployUUPSProxy({artifactPath: artifactPath, initializerData: initializerData, value: 0});
+    }
 
+    /// @notice Deploys an implementation from an artifact and creates a UUPS proxy while forwarding Ether.
+    /// @dev Deploys the implementation using CREATE, then deploys an OpenZeppelin Contracts
+    ///      v5-compatible ERC1967 proxy using CREATE and forwards Ether only to the proxy deployment.
+    /// @param artifactPath The Foundry artifact identifier for the implementation contract.
+    /// @param initializerData Complete initialization calldata executed during proxy construction.
+    /// @param value The amount of Ether forwarded during proxy construction.
+    /// @return proxy The deployed proxy address.
     function deployUUPSProxy(string memory artifactPath, bytes memory initializerData, uint256 value)
         internal
         returns (address proxy)
-    {}
+    {
+        return deployUUPSProxy({
+            implementation: deployCode(artifactPath), initializerData: initializerData, value: value
+        });
+    }
 
+    /// @notice Deploys an implementation from an artifact and creates a UUPS proxy backed by it.
+    /// @dev Deploys the implementation using CREATE, then deploys an OpenZeppelin Contracts
+    ///      v5-compatible ERC1967 proxy using CREATE.
+    /// @param artifactPath The Foundry artifact identifier for the implementation contract.
+    /// @param constructorArgs The ABI-encoded implementation constructor arguments.
+    /// @param initializerData Complete initialization calldata executed during proxy construction.
+    /// @return proxy The deployed proxy address.
     function deployUUPSProxy(string memory artifactPath, bytes memory constructorArgs, bytes memory initializerData)
         internal
         returns (address proxy)
-    {}
+    {
+        return deployUUPSProxy({
+            artifactPath: artifactPath, constructorArgs: constructorArgs, initializerData: initializerData, value: 0
+        });
+    }
 
+    /// @notice Deploys an implementation from an artifact and creates a UUPS proxy while forwarding Ether.
+    /// @dev Deploys the implementation using CREATE, then deploys an OpenZeppelin Contracts
+    ///      v5-compatible ERC1967 proxy using CREATE and forwards Ether only to the proxy deployment.
+    /// @param artifactPath The Foundry artifact identifier for the implementation contract.
+    /// @param constructorArgs The ABI-encoded implementation constructor arguments.
+    /// @param initializerData Complete initialization calldata executed during proxy construction.
+    /// @param value The amount of Ether forwarded during proxy construction.
+    /// @return proxy The deployed proxy address.
     function deployUUPSProxy(
         string memory artifactPath,
         bytes memory constructorArgs,
         bytes memory initializerData,
         uint256 value
-    ) internal returns (address proxy) {}
+    ) internal returns (address proxy) {
+        return deployUUPSProxy({
+            implementation: deployCode(artifactPath, constructorArgs), initializerData: initializerData, value: value
+        });
+    }
 
+    /// @notice Deploys an implementation and UUPS proxy deterministically using a shared CREATE2 salt.
+    /// @dev Deploys both contracts with the same salt. Their distinct init-code hashes produce
+    ///      independently derived CREATE2 addresses.
+    /// @param artifactPath The Foundry artifact identifier for the implementation contract.
+    /// @param initializerData Complete initialization calldata executed during proxy construction.
+    /// @param salt The CREATE2 deployment salt used for both implementation and proxy deployment.
+    /// @return proxy The deployed proxy address.
     function deployUUPSProxy(string memory artifactPath, bytes memory initializerData, bytes32 salt)
         internal
         returns (address proxy)
-    {}
+    {
+        return deployUUPSProxy({artifactPath: artifactPath, initializerData: initializerData, salt: salt, value: 0});
+    }
 
+    /// @notice Deploys an implementation and UUPS proxy deterministically using a shared CREATE2 salt and forwards Ether.
+    /// @dev Deploys both contracts with the same salt and forwards Ether only to the proxy deployment.
+    /// @param artifactPath The Foundry artifact identifier for the implementation contract.
+    /// @param initializerData Complete initialization calldata executed during proxy construction.
+    /// @param salt The CREATE2 deployment salt used for both implementation and proxy deployment.
+    /// @param value The amount of Ether forwarded during proxy construction.
+    /// @return proxy The deployed proxy address.
     function deployUUPSProxy(string memory artifactPath, bytes memory initializerData, bytes32 salt, uint256 value)
         internal
         returns (address proxy)
-    {}
+    {
+        return deployUUPSProxy({
+            implementation: deployCode(artifactPath, salt), initializerData: initializerData, salt: salt, value: value
+        });
+    }
 
+    /// @notice Deploys an implementation and UUPS proxy deterministically using a shared CREATE2 salt.
+    /// @dev Deploys both contracts with the same salt. Their distinct init-code hashes produce
+    ///      independently derived CREATE2 addresses.
+    /// @param artifactPath The Foundry artifact identifier for the implementation contract.
+    /// @param constructorArgs The ABI-encoded implementation constructor arguments.
+    /// @param initializerData Complete initialization calldata executed during proxy construction.
+    /// @param salt The CREATE2 deployment salt used for both implementation and proxy deployment.
+    /// @return proxy The deployed proxy address.
     function deployUUPSProxy(
         string memory artifactPath,
         bytes memory constructorArgs,
         bytes memory initializerData,
         bytes32 salt
-    ) internal returns (address proxy) {}
+    ) internal returns (address proxy) {
+        return deployUUPSProxy({
+            artifactPath: artifactPath,
+            constructorArgs: constructorArgs,
+            initializerData: initializerData,
+            salt: salt,
+            value: 0
+        });
+    }
 
+    /// @notice Deploys an implementation and UUPS proxy deterministically using a shared CREATE2 salt and forwards Ether.
+    /// @dev Deploys both contracts with the same salt and forwards Ether only to the proxy deployment.
+    /// @param artifactPath The Foundry artifact identifier for the implementation contract.
+    /// @param constructorArgs The ABI-encoded implementation constructor arguments.
+    /// @param initializerData Complete initialization calldata executed during proxy construction.
+    /// @param salt The CREATE2 deployment salt used for both implementation and proxy deployment.
+    /// @param value The amount of Ether forwarded during proxy construction.
+    /// @return proxy The deployed proxy address.
     function deployUUPSProxy(
         string memory artifactPath,
         bytes memory constructorArgs,
         bytes memory initializerData,
         bytes32 salt,
         uint256 value
-    ) internal returns (address proxy) {}
+    ) internal returns (address proxy) {
+        return deployUUPSProxy({
+            implementation: deployCode(artifactPath, constructorArgs, salt),
+            initializerData: initializerData,
+            salt: salt,
+            value: value
+        });
+    }
 
-    function upgradeUUPSProxy(address proxy, address implementation, bytes memory initializerData) internal {}
+    /// @notice Upgrades a UUPS proxy to an existing implementation and optionally executes initialization calldata.
+    /// @dev Calls the OpenZeppelin Contracts v5-compatible `upgradeToAndCall(address,bytes)` entry point
+    ///      with zero Ether and verifies the resulting ERC1967 implementation slot.
+    /// @param proxy The UUPS proxy to upgrade.
+    /// @param implementation The new implementation address.
+    /// @param initializerData Complete calldata executed after the implementation update.
+    function upgradeUUPSProxy(address proxy, address implementation, bytes memory initializerData) internal {
+        upgradeUUPSProxy({proxy: proxy, implementation: implementation, initializerData: initializerData, value: 0});
+    }
 
+    /// @notice Upgrades a UUPS proxy to an existing implementation and forwards Ether during the upgrade call.
+    /// @dev Calls the OpenZeppelin Contracts v5-compatible `upgradeToAndCall(address,bytes)` entry point
+    ///      and verifies the resulting ERC1967 implementation slot.
+    /// @param proxy The UUPS proxy to upgrade.
+    /// @param implementation The new implementation address.
+    /// @param initializerData Complete calldata executed after the implementation update.
+    /// @param value The amount of Ether forwarded to the proxy upgrade call.
     function upgradeUUPSProxy(address proxy, address implementation, bytes memory initializerData, uint256 value)
-        internal {}
+        internal
+    {
+        _requireCode(proxy);
+        _upgradeToAndCall(proxy, implementation, initializerData, value);
+        validateImplementation(proxy, implementation);
+    }
 
-    function upgradeUUPSProxy(address proxy, string memory artifactPath, bytes memory initializerData) internal {}
+    /// @notice Deploys a new implementation from an artifact and upgrades a UUPS proxy to it.
+    /// @dev Deploys the implementation using CREATE, then performs an OpenZeppelin Contracts
+    ///      v5-compatible UUPS upgrade with zero Ether.
+    /// @param proxy The UUPS proxy to upgrade.
+    /// @param artifactPath The Foundry artifact identifier for the new implementation contract.
+    /// @param initializerData Complete calldata executed after the implementation update.
+    function upgradeUUPSProxy(address proxy, string memory artifactPath, bytes memory initializerData) internal {
+        upgradeUUPSProxy({proxy: proxy, artifactPath: artifactPath, initializerData: initializerData, value: 0});
+    }
 
+    /// @notice Deploys a new implementation from an artifact and upgrades a UUPS proxy to it while forwarding Ether.
+    /// @dev Deploys the implementation using CREATE, then forwards Ether to the UUPS upgrade call.
+    /// @param proxy The UUPS proxy to upgrade.
+    /// @param artifactPath The Foundry artifact identifier for the new implementation contract.
+    /// @param initializerData Complete calldata executed after the implementation update.
+    /// @param value The amount of Ether forwarded to the proxy upgrade call.
     function upgradeUUPSProxy(address proxy, string memory artifactPath, bytes memory initializerData, uint256 value)
-        internal {}
+        internal
+    {
+        upgradeUUPSProxy({
+            proxy: proxy, implementation: deployCode(artifactPath), initializerData: initializerData, value: value
+        });
+    }
 
+    /// @notice Deploys a new implementation from an artifact and upgrades a UUPS proxy to it.
+    /// @dev Deploys the implementation using CREATE, then performs an OpenZeppelin Contracts
+    ///      v5-compatible UUPS upgrade with zero Ether.
+    /// @param proxy The UUPS proxy to upgrade.
+    /// @param artifactPath The Foundry artifact identifier for the new implementation contract.
+    /// @param constructorArgs The ABI-encoded implementation constructor arguments.
+    /// @param initializerData Complete calldata executed after the implementation update.
     function upgradeUUPSProxy(
         address proxy,
         string memory artifactPath,
         bytes memory constructorArgs,
         bytes memory initializerData
-    ) internal {}
+    ) internal {
+        upgradeUUPSProxy({
+            proxy: proxy,
+            artifactPath: artifactPath,
+            constructorArgs: constructorArgs,
+            initializerData: initializerData,
+            value: 0
+        });
+    }
 
+    /// @notice Deploys a new implementation from an artifact and upgrades a UUPS proxy to it while forwarding Ether.
+    /// @dev Deploys the implementation using CREATE, then forwards Ether to the UUPS upgrade call.
+    /// @param proxy The UUPS proxy to upgrade.
+    /// @param artifactPath The Foundry artifact identifier for the new implementation contract.
+    /// @param constructorArgs The ABI-encoded implementation constructor arguments.
+    /// @param initializerData Complete calldata executed after the implementation update.
+    /// @param value The amount of Ether forwarded to the proxy upgrade call.
     function upgradeUUPSProxy(
         address proxy,
         string memory artifactPath,
         bytes memory constructorArgs,
         bytes memory initializerData,
         uint256 value
-    ) internal {}
+    ) internal {
+        upgradeUUPSProxy({
+            proxy: proxy,
+            implementation: deployCode(artifactPath, constructorArgs),
+            initializerData: initializerData,
+            value: value
+        });
+    }
 
+    /// @notice Deploys a new implementation deterministically and upgrades a UUPS proxy to it.
+    /// @dev Deploys the implementation using CREATE2, then performs the UUPS upgrade with zero Ether.
+    /// @param proxy The UUPS proxy to upgrade.
+    /// @param artifactPath The Foundry artifact identifier for the new implementation contract.
+    /// @param initializerData Complete calldata executed after the implementation update.
+    /// @param salt The CREATE2 deployment salt used for the new implementation.
     function upgradeUUPSProxy(address proxy, string memory artifactPath, bytes memory initializerData, bytes32 salt)
-        internal {}
+        internal
+    {
+        upgradeUUPSProxy({
+            proxy: proxy, artifactPath: artifactPath, initializerData: initializerData, salt: salt, value: 0
+        });
+    }
 
+    /// @notice Deploys a new implementation deterministically and upgrades a UUPS proxy to it while forwarding Ether.
+    /// @dev Deploys the implementation using CREATE2, then forwards Ether to the UUPS upgrade call.
+    /// @param proxy The UUPS proxy to upgrade.
+    /// @param artifactPath The Foundry artifact identifier for the new implementation contract.
+    /// @param initializerData Complete calldata executed after the implementation update.
+    /// @param salt The CREATE2 deployment salt used for the new implementation.
+    /// @param value The amount of Ether forwarded to the proxy upgrade call.
     function upgradeUUPSProxy(
         address proxy,
         string memory artifactPath,
         bytes memory initializerData,
         bytes32 salt,
         uint256 value
-    ) internal {}
+    ) internal {
+        upgradeUUPSProxy({
+            proxy: proxy, implementation: deployCode(artifactPath, salt), initializerData: initializerData, value: value
+        });
+    }
 
+    /// @notice Deploys a new implementation deterministically and upgrades a UUPS proxy to it.
+    /// @dev Deploys the implementation using CREATE2, then performs the UUPS upgrade with zero Ether.
+    /// @param proxy The UUPS proxy to upgrade.
+    /// @param artifactPath The Foundry artifact identifier for the new implementation contract.
+    /// @param constructorArgs The ABI-encoded implementation constructor arguments.
+    /// @param initializerData Complete calldata executed after the implementation update.
+    /// @param salt The CREATE2 deployment salt used for the new implementation.
     function upgradeUUPSProxy(
         address proxy,
         string memory artifactPath,
         bytes memory constructorArgs,
         bytes memory initializerData,
         bytes32 salt
-    ) internal {}
+    ) internal {
+        upgradeUUPSProxy({
+            proxy: proxy,
+            artifactPath: artifactPath,
+            constructorArgs: constructorArgs,
+            initializerData: initializerData,
+            salt: salt,
+            value: 0
+        });
+    }
 
+    /// @notice Deploys a new implementation deterministically and upgrades a UUPS proxy to it while forwarding Ether.
+    /// @dev Deploys the implementation using CREATE2, then forwards Ether to the UUPS upgrade call.
+    /// @param proxy The UUPS proxy to upgrade.
+    /// @param artifactPath The Foundry artifact identifier for the new implementation contract.
+    /// @param constructorArgs The ABI-encoded implementation constructor arguments.
+    /// @param initializerData Complete calldata executed after the implementation update.
+    /// @param salt The CREATE2 deployment salt used for the new implementation.
+    /// @param value The amount of Ether forwarded to the proxy upgrade call.
     function upgradeUUPSProxy(
         address proxy,
         string memory artifactPath,
@@ -282,7 +538,14 @@ library Proxify {
         bytes memory initializerData,
         bytes32 salt,
         uint256 value
-    ) internal {}
+    ) internal {
+        upgradeUUPSProxy({
+            proxy: proxy,
+            implementation: deployCode(artifactPath, constructorArgs, salt),
+            initializerData: initializerData,
+            value: value
+        });
+    }
 
     /*//////////////////////////////////////////////////////////////////////////
                                 TRANSPARENT PROXY
@@ -700,7 +963,27 @@ library Proxify {
         }
     }
 
-    function _upgradeToAndCall(address proxy, address implementation, bytes memory data, uint256 value) private {}
+    function _upgradeToAndCall(address proxy, address implementation, bytes memory data, uint256 value) private {
+        assembly ("memory-safe") {
+            let ptr := mload(0x40)
+            mstore(ptr, 0x4f1ef286) // upgradeToAndCall(address,bytes)
+            mstore(add(ptr, 0x20), shr(0x60, shl(0x60, implementation)))
+            mstore(add(ptr, 0x40), 0x40)
+
+            let length := add(mload(data), 0x20)
+            mcopy(add(ptr, 0x60), data, length)
+
+            if iszero(call(gas(), proxy, value, add(ptr, 0x1c), add(length, 0x44), 0x00, 0x00)) {
+                if iszero(returndatasize()) {
+                    mstore(0x00, 0x55299b49) // UpgradeFailed()
+                    revert(0x1c, 0x04)
+                }
+
+                returndatacopy(ptr, 0x00, returndatasize())
+                revert(ptr, returndatasize())
+            }
+        }
+    }
 
     function _upgradeAndCall(address admin, address proxy, address implementation, bytes memory data, uint256 value)
         private {}
