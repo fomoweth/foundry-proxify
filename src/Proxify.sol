@@ -551,83 +551,265 @@ library Proxify {
                                 TRANSPARENT PROXY
     //////////////////////////////////////////////////////////////////////////*/
 
+    /// @notice Deploys a transparent proxy backed by an existing implementation.
+    /// @dev Deploys an OpenZeppelin Contracts v5-compatible TransparentUpgradeableProxy using CREATE,
+    ///      validates the associated ProxyAdmin and owner, and verifies the implementation slot.
+    /// @param implementation The initial implementation address.
+    /// @param initialOwner The initial owner assigned to the generated ProxyAdmin.
+    /// @param initializerData Complete initialization calldata executed during proxy construction.
+    /// @return proxy The deployed transparent proxy address.
     function deployTransparentProxy(address implementation, address initialOwner, bytes memory initializerData)
         internal
         returns (address proxy)
-    {}
+    {
+        return deployTransparentProxy({
+            implementation: implementation, initialOwner: initialOwner, initializerData: initializerData, value: 0
+        });
+    }
 
+    /// @notice Deploys a transparent proxy backed by an existing implementation and forwards Ether during initialization.
+    /// @dev Deploys an OpenZeppelin Contracts v5-compatible TransparentUpgradeableProxy using CREATE,
+    ///      validates the generated ProxyAdmin, and verifies the proxy's ERC1967 state.
+    /// @param implementation The initial implementation address.
+    /// @param initialOwner The initial owner assigned to the generated ProxyAdmin.
+    /// @param initializerData Complete initialization calldata executed during proxy construction.
+    /// @param value The amount of Ether forwarded during proxy construction.
+    /// @return proxy The deployed transparent proxy address.
     function deployTransparentProxy(
         address implementation,
         address initialOwner,
         bytes memory initializerData,
         uint256 value
-    ) internal returns (address proxy) {}
+    ) internal returns (address proxy) {
+        proxy = deployCode({
+            artifactPath: "TransparentUpgradeableProxy.sol:TransparentUpgradeableProxy",
+            constructorArgs: abi.encode(implementation, initialOwner, initializerData),
+            value: value
+        });
 
+        address admin = vm.computeCreateAddress(proxy, 1);
+        validateAdmin(proxy, admin);
+        validateOwner(admin, initialOwner);
+        validateImplementation(proxy, implementation);
+    }
+
+    /// @notice Deploys a transparent proxy deterministically around an existing implementation.
+    /// @dev Uses CREATE2 for the proxy deployment and verifies the generated ProxyAdmin,
+    ///      its owner, and the proxy's ERC1967 implementation and admin state.
+    /// @param implementation The initial implementation address.
+    /// @param initialOwner The initial owner assigned to the generated ProxyAdmin.
+    /// @param initializerData Complete initialization calldata executed during proxy construction.
+    /// @param salt The CREATE2 deployment salt.
+    /// @return proxy The deployed transparent proxy address.
     function deployTransparentProxy(
         address implementation,
         address initialOwner,
         bytes memory initializerData,
         bytes32 salt
-    ) internal returns (address proxy) {}
+    ) internal returns (address proxy) {
+        return deployTransparentProxy({
+            implementation: implementation,
+            initialOwner: initialOwner,
+            initializerData: initializerData,
+            salt: salt,
+            value: 0
+        });
+    }
 
+    /// @notice Deploys a transparent proxy deterministically and forwards Ether during initialization.
+    /// @dev Uses CREATE2 for the proxy deployment and verifies the generated ProxyAdmin,
+    ///      its owner, and the proxy's ERC1967 implementation and admin state.
+    /// @param implementation The initial implementation address.
+    /// @param initialOwner The initial owner assigned to the generated ProxyAdmin.
+    /// @param initializerData Complete initialization calldata executed during proxy construction.
+    /// @param salt The CREATE2 deployment salt.
+    /// @param value The amount of Ether forwarded during proxy construction.
+    /// @return proxy The deployed transparent proxy address.
     function deployTransparentProxy(
         address implementation,
         address initialOwner,
         bytes memory initializerData,
         bytes32 salt,
         uint256 value
-    ) internal returns (address proxy) {}
+    ) internal returns (address proxy) {
+        proxy = deployCode({
+            artifactPath: "TransparentUpgradeableProxy.sol:TransparentUpgradeableProxy",
+            constructorArgs: abi.encode(implementation, initialOwner, initializerData),
+            salt: salt,
+            value: value
+        });
 
+        address admin = vm.computeCreateAddress(proxy, 1);
+        validateAdmin(proxy, admin);
+        validateOwner(admin, initialOwner);
+        validateImplementation(proxy, implementation);
+    }
+
+    /// @notice Deploys an implementation from an artifact and creates a transparent proxy backed by it.
+    /// @dev Deploys the implementation and proxy using CREATE and assigns ownership of the generated
+    ///      ProxyAdmin to the specified initial owner.
+    /// @param artifactPath The Foundry artifact identifier for the implementation contract.
+    /// @param initialOwner The initial owner assigned to the generated ProxyAdmin.
+    /// @param initializerData Complete initialization calldata executed during proxy construction.
+    /// @return proxy The deployed transparent proxy address.
     function deployTransparentProxy(string memory artifactPath, address initialOwner, bytes memory initializerData)
         internal
         returns (address proxy)
-    {}
+    {
+        return deployTransparentProxy({
+            artifactPath: artifactPath, initialOwner: initialOwner, initializerData: initializerData, value: 0
+        });
+    }
 
+    /// @notice Deploys an implementation from an artifact and creates a transparent proxy while forwarding Ether.
+    /// @dev Deploys both implementation and proxy using CREATE and forwards Ether only to the proxy deployment.
+    /// @param artifactPath The Foundry artifact identifier for the implementation contract.
+    /// @param initialOwner The initial owner assigned to the generated ProxyAdmin.
+    /// @param initializerData Complete initialization calldata executed during proxy construction.
+    /// @param value The amount of Ether forwarded during proxy construction.
+    /// @return proxy The deployed transparent proxy address.
     function deployTransparentProxy(
         string memory artifactPath,
         address initialOwner,
         bytes memory initializerData,
         uint256 value
-    ) internal returns (address proxy) {}
+    ) internal returns (address proxy) {
+        return deployTransparentProxy({
+            implementation: deployCode(artifactPath),
+            initialOwner: initialOwner,
+            initializerData: initializerData,
+            value: value
+        });
+    }
 
+    /// @notice Deploys an implementation from an artifact and creates a transparent proxy backed by it.
+    /// @dev Deploys the implementation and proxy using CREATE and assigns ownership of the generated
+    ///      ProxyAdmin to the specified initial owner.
+    /// @param artifactPath The Foundry artifact identifier for the implementation contract.
+    /// @param constructorArgs The ABI-encoded implementation constructor arguments.
+    /// @param initialOwner The initial owner assigned to the generated ProxyAdmin.
+    /// @param initializerData Complete initialization calldata executed during proxy construction.
+    /// @return proxy The deployed transparent proxy address.
     function deployTransparentProxy(
         string memory artifactPath,
         bytes memory constructorArgs,
         address initialOwner,
         bytes memory initializerData
-    ) internal returns (address proxy) {}
+    ) internal returns (address proxy) {
+        return deployTransparentProxy({
+            artifactPath: artifactPath,
+            constructorArgs: constructorArgs,
+            initialOwner: initialOwner,
+            initializerData: initializerData,
+            value: 0
+        });
+    }
 
+    /// @notice Deploys an implementation from an artifact and creates a transparent proxy while forwarding Ether.
+    /// @dev Deploys both implementation and proxy using CREATE and forwards Ether only to the proxy deployment.
+    /// @param artifactPath The Foundry artifact identifier for the implementation contract.
+    /// @param constructorArgs The ABI-encoded implementation constructor arguments.
+    /// @param initialOwner The initial owner assigned to the generated ProxyAdmin.
+    /// @param initializerData Complete initialization calldata executed during proxy construction.
+    /// @param value The amount of Ether forwarded during proxy construction.
+    /// @return proxy The deployed transparent proxy address.
     function deployTransparentProxy(
         string memory artifactPath,
         bytes memory constructorArgs,
         address initialOwner,
         bytes memory initializerData,
         uint256 value
-    ) internal returns (address proxy) {}
+    ) internal returns (address proxy) {
+        return deployTransparentProxy({
+            implementation: deployCode(artifactPath, constructorArgs),
+            initialOwner: initialOwner,
+            initializerData: initializerData,
+            value: value
+        });
+    }
 
+    /// @notice Deploys an implementation and transparent proxy deterministically using a shared CREATE2 salt.
+    /// @dev Uses the same salt for implementation and proxy deployment and verifies the generated
+    ///      ProxyAdmin and resulting ERC1967 proxy state.
+    /// @param artifactPath The Foundry artifact identifier for the implementation contract.
+    /// @param initialOwner The initial owner assigned to the generated ProxyAdmin.
+    /// @param initializerData Complete initialization calldata executed during proxy construction.
+    /// @param salt The CREATE2 deployment salt used for both implementation and proxy deployment.
+    /// @return proxy The deployed transparent proxy address.
     function deployTransparentProxy(
         string memory artifactPath,
         address initialOwner,
         bytes memory initializerData,
         bytes32 salt
-    ) internal returns (address proxy) {}
+    ) internal returns (address proxy) {
+        return deployTransparentProxy({
+            artifactPath: artifactPath,
+            initialOwner: initialOwner,
+            initializerData: initializerData,
+            salt: salt,
+            value: 0
+        });
+    }
 
+    /// @notice Deploys an implementation and transparent proxy deterministically and forwards Ether during initialization.
+    /// @dev Uses the same CREATE2 salt for both deployments and forwards Ether only to the proxy deployment.
+    /// @param artifactPath The Foundry artifact identifier for the implementation contract.
+    /// @param initialOwner The initial owner assigned to the generated ProxyAdmin.
+    /// @param initializerData Complete initialization calldata executed during proxy construction.
+    /// @param salt The CREATE2 deployment salt used for both implementation and proxy deployment.
+    /// @param value The amount of Ether forwarded during proxy construction.
+    /// @return proxy The deployed transparent proxy address.
     function deployTransparentProxy(
         string memory artifactPath,
         address initialOwner,
         bytes memory initializerData,
         bytes32 salt,
         uint256 value
-    ) internal returns (address proxy) {}
+    ) internal returns (address proxy) {
+        return deployTransparentProxy({
+            implementation: deployCode(artifactPath, salt),
+            initialOwner: initialOwner,
+            initializerData: initializerData,
+            salt: salt,
+            value: value
+        });
+    }
 
+    /// @notice Deploys an implementation and transparent proxy deterministically using a shared CREATE2 salt.
+    /// @dev Uses the same salt for implementation and proxy deployment and verifies the generated
+    ///      ProxyAdmin and resulting ERC1967 proxy state.
+    /// @param artifactPath The Foundry artifact identifier for the implementation contract.
+    /// @param constructorArgs The ABI-encoded implementation constructor arguments.
+    /// @param initialOwner The initial owner assigned to the generated ProxyAdmin.
+    /// @param initializerData Complete initialization calldata executed during proxy construction.
+    /// @param salt The CREATE2 deployment salt used for both implementation and proxy deployment.
+    /// @return proxy The deployed transparent proxy address.
     function deployTransparentProxy(
         string memory artifactPath,
         bytes memory constructorArgs,
         address initialOwner,
         bytes memory initializerData,
         bytes32 salt
-    ) internal returns (address proxy) {}
+    ) internal returns (address proxy) {
+        return deployTransparentProxy({
+            artifactPath: artifactPath,
+            constructorArgs: constructorArgs,
+            initialOwner: initialOwner,
+            initializerData: initializerData,
+            salt: salt,
+            value: 0
+        });
+    }
 
+    /// @notice Deploys an implementation and transparent proxy deterministically and forwards Ether during initialization.
+    /// @dev Uses the same CREATE2 salt for both deployments and forwards Ether only to the proxy deployment.
+    /// @param artifactPath The Foundry artifact identifier for the implementation contract.
+    /// @param constructorArgs The ABI-encoded implementation constructor arguments.
+    /// @param initialOwner The initial owner assigned to the generated ProxyAdmin.
+    /// @param initializerData Complete initialization calldata executed during proxy construction.
+    /// @param salt The CREATE2 deployment salt used for both implementation and proxy deployment.
+    /// @param value The amount of Ether forwarded during proxy construction.
+    /// @return proxy The deployed transparent proxy address.
     function deployTransparentProxy(
         string memory artifactPath,
         bytes memory constructorArgs,
@@ -635,61 +817,186 @@ library Proxify {
         bytes memory initializerData,
         bytes32 salt,
         uint256 value
-    ) internal returns (address proxy) {}
+    ) internal returns (address proxy) {
+        return deployTransparentProxy({
+            implementation: deployCode(artifactPath, constructorArgs, salt),
+            initialOwner: initialOwner,
+            initializerData: initializerData,
+            salt: salt,
+            value: value
+        });
+    }
 
-    function upgradeTransparentProxy(address proxy, address implementation, bytes memory initializerData) internal {}
+    /// @notice Upgrades a transparent proxy to an existing implementation and optionally executes initialization calldata.
+    /// @dev Resolves the proxy's ERC1967 admin and calls the OpenZeppelin Contracts v5-compatible
+    ///      ProxyAdmin `upgradeAndCall(address,address,bytes)` entry point with zero Ether.
+    /// @param proxy The transparent proxy to upgrade.
+    /// @param implementation The new implementation address.
+    /// @param initializerData Complete calldata executed after the implementation update.
+    function upgradeTransparentProxy(address proxy, address implementation, bytes memory initializerData) internal {
+        upgradeTransparentProxy({
+            proxy: proxy, implementation: implementation, initializerData: initializerData, value: 0
+        });
+    }
 
+    /// @notice Upgrades a transparent proxy to an existing implementation and forwards Ether during the upgrade call.
+    /// @dev Resolves and validates the proxy's ProxyAdmin, calls `upgradeAndCall`, and verifies
+    ///      the resulting ERC1967 implementation slot.
+    /// @param proxy The transparent proxy to upgrade.
+    /// @param implementation The new implementation address.
+    /// @param initializerData Complete calldata executed after the implementation update.
+    /// @param value The amount of Ether forwarded to the ProxyAdmin upgrade call.
     function upgradeTransparentProxy(address proxy, address implementation, bytes memory initializerData, uint256 value)
-        internal {}
+        internal
+    {
+        _requireCode(proxy);
+        address admin = getAdmin(proxy);
+        _requireCode(admin);
+        _upgradeAndCall(admin, proxy, implementation, initializerData, value);
+        validateImplementation(proxy, implementation);
+    }
 
-    function upgradeTransparentProxy(address proxy, string memory artifactPath, bytes memory initializerData)
-        internal {}
+    /// @notice Deploys a new implementation from an artifact and upgrades a transparent proxy to it.
+    /// @dev Deploys the implementation using CREATE and performs the upgrade through the proxy's
+    ///      OpenZeppelin Contracts v5-compatible ProxyAdmin.
+    /// @param proxy The transparent proxy to upgrade.
+    /// @param artifactPath The Foundry artifact identifier for the new implementation contract.
+    /// @param initializerData Complete calldata executed after the implementation update.
+    function upgradeTransparentProxy(address proxy, string memory artifactPath, bytes memory initializerData) internal {
+        upgradeTransparentProxy({proxy: proxy, artifactPath: artifactPath, initializerData: initializerData, value: 0});
+    }
 
+    /// @notice Deploys a new implementation from an artifact and upgrades a transparent proxy while forwarding Ether.
+    /// @dev Deploys the implementation using CREATE and forwards Ether to the ProxyAdmin upgrade call.
+    /// @param proxy The transparent proxy to upgrade.
+    /// @param artifactPath The Foundry artifact identifier for the new implementation contract.
+    /// @param initializerData Complete calldata executed after the implementation update.
+    /// @param value The amount of Ether forwarded to the ProxyAdmin upgrade call.
     function upgradeTransparentProxy(
         address proxy,
         string memory artifactPath,
         bytes memory initializerData,
         uint256 value
-    ) internal {}
+    ) internal {
+        upgradeTransparentProxy({
+            proxy: proxy, implementation: deployCode(artifactPath), initializerData: initializerData, value: value
+        });
+    }
 
+    /// @notice Deploys a new implementation from an artifact and upgrades a transparent proxy to it.
+    /// @dev Deploys the implementation using CREATE and performs the upgrade through the proxy's
+    ///      OpenZeppelin Contracts v5-compatible ProxyAdmin.
+    /// @param proxy The transparent proxy to upgrade.
+    /// @param artifactPath The Foundry artifact identifier for the new implementation contract.
+    /// @param constructorArgs The ABI-encoded implementation constructor arguments.
+    /// @param initializerData Complete calldata executed after the implementation update.
     function upgradeTransparentProxy(
         address proxy,
         string memory artifactPath,
         bytes memory constructorArgs,
         bytes memory initializerData
-    ) internal {}
+    ) internal {
+        upgradeTransparentProxy({
+            proxy: proxy,
+            artifactPath: artifactPath,
+            constructorArgs: constructorArgs,
+            initializerData: initializerData,
+            value: 0
+        });
+    }
 
+    /// @notice Deploys a new implementation from an artifact and upgrades a transparent proxy while forwarding Ether.
+    /// @dev Deploys the implementation using CREATE and forwards Ether to the ProxyAdmin upgrade call.
+    /// @param proxy The transparent proxy to upgrade.
+    /// @param artifactPath The Foundry artifact identifier for the new implementation contract.
+    /// @param constructorArgs The ABI-encoded implementation constructor arguments.
+    /// @param initializerData Complete calldata executed after the implementation update.
+    /// @param value The amount of Ether forwarded to the ProxyAdmin upgrade call.
     function upgradeTransparentProxy(
         address proxy,
         string memory artifactPath,
         bytes memory constructorArgs,
         bytes memory initializerData,
         uint256 value
-    ) internal {}
+    ) internal {
+        upgradeTransparentProxy({
+            proxy: proxy,
+            implementation: deployCode(artifactPath, constructorArgs),
+            initializerData: initializerData,
+            value: value
+        });
+    }
 
+    /// @notice Deploys a new implementation deterministically and upgrades a transparent proxy to it.
+    /// @dev Deploys the new implementation using CREATE2 and performs the upgrade through the
+    ///      proxy's OpenZeppelin Contracts v5-compatible ProxyAdmin.
+    /// @param proxy The transparent proxy to upgrade.
+    /// @param artifactPath The Foundry artifact identifier for the new implementation contract.
+    /// @param initializerData Complete calldata executed after the implementation update.
+    /// @param salt The CREATE2 deployment salt used for the new implementation.
     function upgradeTransparentProxy(
         address proxy,
         string memory artifactPath,
         bytes memory initializerData,
         bytes32 salt
-    ) internal {}
+    ) internal {
+        upgradeTransparentProxy({
+            proxy: proxy, artifactPath: artifactPath, initializerData: initializerData, salt: salt, value: 0
+        });
+    }
 
+    /// @notice Deploys a new implementation deterministically and upgrades a transparent proxy while forwarding Ether.
+    /// @dev Deploys the new implementation using CREATE2 and forwards Ether to the ProxyAdmin upgrade call.
+    /// @param proxy The transparent proxy to upgrade.
+    /// @param artifactPath The Foundry artifact identifier for the new implementation contract.
+    /// @param initializerData Complete calldata executed after the implementation update.
+    /// @param salt The CREATE2 deployment salt used for the new implementation.
+    /// @param value The amount of Ether forwarded to the ProxyAdmin upgrade call.
     function upgradeTransparentProxy(
         address proxy,
         string memory artifactPath,
         bytes memory initializerData,
         bytes32 salt,
         uint256 value
-    ) internal {}
+    ) internal {
+        upgradeTransparentProxy({
+            proxy: proxy, implementation: deployCode(artifactPath, salt), initializerData: initializerData, value: value
+        });
+    }
 
+    /// @notice Deploys a new implementation deterministically and upgrades a transparent proxy to it.
+    /// @dev Deploys the new implementation using CREATE2 and performs the upgrade through the
+    ///      proxy's OpenZeppelin Contracts v5-compatible ProxyAdmin.
+    /// @param proxy The transparent proxy to upgrade.
+    /// @param artifactPath The Foundry artifact identifier for the new implementation contract.
+    /// @param constructorArgs The ABI-encoded implementation constructor arguments.
+    /// @param initializerData Complete calldata executed after the implementation update.
+    /// @param salt The CREATE2 deployment salt used for the new implementation.
     function upgradeTransparentProxy(
         address proxy,
         string memory artifactPath,
         bytes memory constructorArgs,
         bytes memory initializerData,
         bytes32 salt
-    ) internal {}
+    ) internal {
+        upgradeTransparentProxy({
+            proxy: proxy,
+            artifactPath: artifactPath,
+            constructorArgs: constructorArgs,
+            initializerData: initializerData,
+            salt: salt,
+            value: 0
+        });
+    }
 
+    /// @notice Deploys a new implementation deterministically and upgrades a transparent proxy while forwarding Ether.
+    /// @dev Deploys the new implementation using CREATE2 and forwards Ether to the ProxyAdmin upgrade call.
+    /// @param proxy The transparent proxy to upgrade.
+    /// @param artifactPath The Foundry artifact identifier for the new implementation contract.
+    /// @param constructorArgs The ABI-encoded implementation constructor arguments.
+    /// @param initializerData Complete calldata executed after the implementation update.
+    /// @param salt The CREATE2 deployment salt used for the new implementation.
+    /// @param value The amount of Ether forwarded to the ProxyAdmin upgrade call.
     function upgradeTransparentProxy(
         address proxy,
         string memory artifactPath,
@@ -697,7 +1004,14 @@ library Proxify {
         bytes memory initializerData,
         bytes32 salt,
         uint256 value
-    ) internal {}
+    ) internal {
+        upgradeTransparentProxy({
+            proxy: proxy,
+            implementation: deployCode(artifactPath, constructorArgs, salt),
+            initializerData: initializerData,
+            value: value
+        });
+    }
 
     /*//////////////////////////////////////////////////////////////////////////
                                     BEACON PROXY
@@ -935,7 +1249,7 @@ library Proxify {
 
     /// @dev Deploys complete init code using CREATE or CREATE2 and forwards Ether.
     ///      Bubbles constructor revert data when available and reverts with
-    ///      {DeploymentFailed} error when creation fails without revert data.
+    ///      {DeploymentFailed} when creation fails without revert data.
     /// @param initCode The complete contract init code, including constructor arguments.
     /// @param value The amount of Ether forwarded during contract creation.
     /// @param salt The CREATE2 salt when deterministic deployment is selected.
@@ -963,6 +1277,12 @@ library Proxify {
         }
     }
 
+    /// @dev Calls an OpenZeppelin Contracts v5-compatible UUPS `upgradeToAndCall(address,bytes)` entry point through the proxy.
+    ///      Bubbles downstream revert data when available and reverts with {UpgradeFailed} when the call fails without revert data.
+    /// @param proxy The UUPS proxy receiving the upgrade call.
+    /// @param implementation The new implementation address.
+    /// @param data Complete calldata executed after the implementation update.
+    /// @param value The amount of Ether forwarded to the proxy call.
     function _upgradeToAndCall(address proxy, address implementation, bytes memory data, uint256 value) private {
         assembly ("memory-safe") {
             let ptr := mload(0x40)
@@ -985,8 +1305,37 @@ library Proxify {
         }
     }
 
+    /// @dev Calls an OpenZeppelin Contracts v5-compatible ProxyAdmin `upgradeAndCall(address,address,bytes)` entry point.
+    ///      Bubbles downstream revert data when available and reverts with {UpgradeFailed} when the call fails without revert data.
+    /// @param admin The ProxyAdmin receiving the upgrade call.
+    /// @param proxy The transparent proxy being upgraded.
+    /// @param implementation The new implementation address.
+    /// @param data Complete calldata executed after the implementation update.
+    /// @param value The amount of Ether forwarded to the ProxyAdmin call.
     function _upgradeAndCall(address admin, address proxy, address implementation, bytes memory data, uint256 value)
-        private {}
+        private
+    {
+        assembly ("memory-safe") {
+            let ptr := mload(0x40)
+            mstore(ptr, 0x9623609d) // upgradeAndCall(address,address,bytes)
+            mstore(add(ptr, 0x20), shr(0x60, shl(0x60, proxy)))
+            mstore(add(ptr, 0x40), shr(0x60, shl(0x60, implementation)))
+            mstore(add(ptr, 0x60), 0x60)
+
+            let length := add(mload(data), 0x20)
+            mcopy(add(ptr, 0x80), data, length)
+
+            if iszero(call(gas(), admin, value, add(ptr, 0x1c), add(length, 0x64), 0x00, 0x00)) {
+                if iszero(returndatasize()) {
+                    mstore(0x00, 0x55299b49) // UpgradeFailed()
+                    revert(0x1c, 0x04)
+                }
+
+                returndatacopy(ptr, 0x00, returndatasize())
+                revert(ptr, returndatasize())
+            }
+        }
+    }
 
     function _upgradeBeaconTo(address beacon, address implementation) private {}
 

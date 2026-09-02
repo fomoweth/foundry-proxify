@@ -16,8 +16,14 @@ abstract contract ProxifyTestBase is Test {
     bytes32 internal constant ADMIN_SLOT = 0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103;
     bytes32 internal constant BEACON_SLOT = 0xa3f0ad74e5423aebfd80d3ef4346578335a9a72aeaee59ff6cb3582b35133d50;
 
+    string internal constant GREETER_V1_PATH = "Greeters.sol:GreeterV1";
+    string internal constant GREETER_V2_PATH = "Greeters.sol:GreeterV2";
+
     string internal constant GREETER_V1_PROXIABLE_PATH = "Greeters.sol:GreeterV1Proxiable";
     string internal constant GREETER_V2_PROXIABLE_PATH = "Greeters.sol:GreeterV2Proxiable";
+
+    bytes internal constant GREETER_V1_BYTECODE = type(GreeterV1).creationCode;
+    bytes internal constant GREETER_V2_BYTECODE = type(GreeterV2).creationCode;
 
     bytes internal constant GREETER_V1_PROXIABLE_BYTECODE = type(GreeterV1Proxiable).creationCode;
     bytes internal constant GREETER_V2_PROXIABLE_BYTECODE = type(GreeterV2Proxiable).creationCode;
@@ -95,6 +101,42 @@ abstract contract ProxifyTestBase is Test {
         assertEq(address(uint160(uint256(vm.load(proxy, IMPLEMENTATION_SLOT)))), implementation);
     }
 
+    function assertTransparentProxy(address proxy, address implementation, address initialOwner, uint256 value)
+        internal
+        view
+    {
+        assertContract(proxy);
+        assertEq(proxy.balance, value);
+
+        assertContract(implementation);
+        assertEq(address(uint160(uint256(vm.load(proxy, IMPLEMENTATION_SLOT)))), implementation);
+
+        address admin = computeProxyAdminAddress(proxy);
+        assertContract(admin);
+        assertEq(address(uint160(uint256(vm.load(proxy, ADMIN_SLOT)))), admin);
+        assertEq(ProxyAdmin(admin).owner(), initialOwner);
+    }
+
+    function assertBeacon(address beacon, address implementation, address initialOwner) internal view {
+        assertContract(beacon);
+        assertEq(UpgradeableBeacon(beacon).implementation(), implementation);
+        assertEq(UpgradeableBeacon(beacon).owner(), initialOwner);
+    }
+
+    function assertBeaconProxy(
+        address proxy,
+        address beacon,
+        address implementation,
+        address initialOwner,
+        uint256 value
+    ) internal view {
+        assertContract(proxy);
+        assertEq(proxy.balance, value);
+
+        assertEq(address(uint160(uint256(vm.load(proxy, BEACON_SLOT)))), beacon);
+        assertBeacon(beacon, implementation, initialOwner);
+    }
+
     function assertGreeterV1(address proxy, address initialOwner, string memory initialGreeting) internal view {
         GreeterV1 instance = GreeterV1(proxy);
         assertEq(instance.version(), 1);
@@ -106,10 +148,6 @@ abstract contract ProxifyTestBase is Test {
         GreeterV2 instance = GreeterV2(proxy);
         assertEq(instance.version(), 2);
         assertEq(instance.greeting(), "resetted");
-    }
-
-    function assertContract(address target, string memory message) internal view {
-        assertNotEq(target.code.length, 0, message);
     }
 
     function assertContract(address target) internal view {
