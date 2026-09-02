@@ -27,14 +27,14 @@ contract ProxifyUpgradeUUPSProxyTest is ProxifyTestBase {
         Proxify.upgradeUUPSProxy(proxy, implementationV2, encodeReinitializerData());
 
         assertUUPSProxy(proxy, implementationV2, 0);
-        assertGreeterV2(proxy);
+        assertGreeterV2(proxy, false);
     }
 
     function test_upgradeUUPSProxy_withExistingImplementationAndValue() public {
         Proxify.upgradeUUPSProxy(proxy, implementationV2, encodeReinitializerData(), defaultValue);
 
         assertUUPSProxy(proxy, implementationV2, defaultValue);
-        assertGreeterV2(proxy);
+        assertGreeterV2(proxy, false);
     }
 
     function test_upgradeUUPSProxy_withArtifact() public {
@@ -42,7 +42,7 @@ contract ProxifyUpgradeUUPSProxyTest is ProxifyTestBase {
         Proxify.upgradeUUPSProxy(proxy, GREETER_V2_PROXIABLE_PATH, encodeReinitializerData());
 
         assertUUPSProxy(proxy, implementationV2, 0);
-        assertGreeterV2(proxy);
+        assertGreeterV2(proxy, false);
     }
 
     function test_upgradeUUPSProxy_withArtifactAndValue() public {
@@ -52,7 +52,7 @@ contract ProxifyUpgradeUUPSProxyTest is ProxifyTestBase {
         Proxify.upgradeUUPSProxy(proxy, GREETER_V2_PROXIABLE_PATH, data, defaultValue);
 
         assertUUPSProxy(proxy, implementationV2, defaultValue);
-        assertGreeterV2(proxy);
+        assertGreeterV2(proxy, false);
     }
 
     function test_upgradeUUPSProxy_withArtifactUsesSalt() public {
@@ -62,7 +62,7 @@ contract ProxifyUpgradeUUPSProxyTest is ProxifyTestBase {
         Proxify.upgradeUUPSProxy(proxy, GREETER_V2_PROXIABLE_PATH, data, defaultSalt);
 
         assertUUPSProxy(proxy, implementationV2, 0);
-        assertGreeterV2(proxy);
+        assertGreeterV2(proxy, false);
     }
 
     function test_upgradeUUPSProxy_withArtifactAndValueUsesSalt() public {
@@ -72,7 +72,7 @@ contract ProxifyUpgradeUUPSProxyTest is ProxifyTestBase {
         Proxify.upgradeUUPSProxy(proxy, GREETER_V2_PROXIABLE_PATH, data, defaultSalt, defaultValue);
 
         assertUUPSProxy(proxy, implementationV2, defaultValue);
-        assertGreeterV2(proxy);
+        assertGreeterV2(proxy, false);
     }
 
     function test_upgradeUUPSProxy_bubblesDownstreamRevert() public {
@@ -102,7 +102,7 @@ contract ProxifyUpgradeUUPSProxyTest is ProxifyTestBase {
         Proxify.upgradeUUPSProxy(proxy, implementationV2, encodeReinitializerData(), value);
 
         assertUUPSProxy(proxy, implementationV2, value);
-        assertGreeterV2(proxy);
+        assertGreeterV2(proxy, false);
     }
 
     function test_fuzz_upgradeUUPSProxy_withArtifactUsesSalt(bytes32 salt, uint256 value) public {
@@ -114,7 +114,7 @@ contract ProxifyUpgradeUUPSProxyTest is ProxifyTestBase {
         Proxify.upgradeUUPSProxy(proxy, GREETER_V2_PROXIABLE_PATH, data, salt, value);
 
         assertUUPSProxy(proxy, implementationV2, value);
-        assertGreeterV2(proxy);
+        assertGreeterV2(proxy, false);
     }
 
     function upgradeUUPSProxy(address implementation, bytes calldata data) external {

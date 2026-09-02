@@ -28,7 +28,7 @@ contract ProxifyUpgradeTransparentProxyTest is ProxifyTestBase {
         Proxify.upgradeTransparentProxy(proxy, implementationV2, data);
 
         assertTransparentProxy(proxy, implementationV2, address(this), 0);
-        assertGreeterV2(proxy);
+        assertGreeterV2(proxy, false);
     }
 
     function test_upgradeTransparentProxy_withExistingImplementationAndValue() public {
@@ -36,7 +36,7 @@ contract ProxifyUpgradeTransparentProxyTest is ProxifyTestBase {
         Proxify.upgradeTransparentProxy(proxy, implementationV2, data, defaultValue);
 
         assertTransparentProxy(proxy, implementationV2, address(this), defaultValue);
-        assertGreeterV2(proxy);
+        assertGreeterV2(proxy, false);
     }
 
     function test_upgradeTransparentProxy_withArtifact() public {
@@ -46,7 +46,7 @@ contract ProxifyUpgradeTransparentProxyTest is ProxifyTestBase {
         Proxify.upgradeTransparentProxy(proxy, GREETER_V2_PATH, data);
 
         assertTransparentProxy(proxy, implementationV2, address(this), 0);
-        assertGreeterV2(proxy);
+        assertGreeterV2(proxy, false);
     }
 
     function test_upgradeTransparentProxy_withArtifactAndValue() public {
@@ -56,7 +56,7 @@ contract ProxifyUpgradeTransparentProxyTest is ProxifyTestBase {
         Proxify.upgradeTransparentProxy(proxy, GREETER_V2_PATH, data, defaultValue);
 
         assertTransparentProxy(proxy, implementationV2, address(this), defaultValue);
-        assertGreeterV2(proxy);
+        assertGreeterV2(proxy, false);
     }
 
     function test_upgradeTransparentProxy_withArtifactUsesSalt() public {
@@ -66,7 +66,7 @@ contract ProxifyUpgradeTransparentProxyTest is ProxifyTestBase {
         Proxify.upgradeTransparentProxy(proxy, GREETER_V2_PATH, data, defaultSalt);
 
         assertTransparentProxy(proxy, implementationV2, address(this), 0);
-        assertGreeterV2(proxy);
+        assertGreeterV2(proxy, false);
     }
 
     function test_upgradeTransparentProxy_withArtifactAndValueUsesSalt() public {
@@ -76,7 +76,7 @@ contract ProxifyUpgradeTransparentProxyTest is ProxifyTestBase {
         Proxify.upgradeTransparentProxy(proxy, GREETER_V2_PATH, data, defaultSalt, defaultValue);
 
         assertTransparentProxy(proxy, implementationV2, address(this), defaultValue);
-        assertGreeterV2(proxy);
+        assertGreeterV2(proxy, false);
     }
 
     function test_upgradeTransparentProxy_bubblesDownstreamRevert() public {
@@ -117,7 +117,7 @@ contract ProxifyUpgradeTransparentProxyTest is ProxifyTestBase {
         Proxify.upgradeTransparentProxy(proxy, implementationV2, data, value);
 
         assertTransparentProxy(proxy, implementationV2, address(this), value);
-        assertGreeterV2(proxy);
+        assertGreeterV2(proxy, false);
     }
 
     function test_fuzz_upgradeTransparentProxy_withArtifactUsesSalt(bytes32 salt, uint256 value) public {
@@ -129,7 +129,7 @@ contract ProxifyUpgradeTransparentProxyTest is ProxifyTestBase {
         Proxify.upgradeTransparentProxy(proxy, GREETER_V2_PATH, data, salt, value);
 
         assertTransparentProxy(proxy, implementationV2, address(this), value);
-        assertGreeterV2(proxy);
+        assertGreeterV2(proxy, false);
     }
 
     function upgradeTransparentProxy(address implementation, bytes calldata data) external {

@@ -144,8 +144,9 @@ abstract contract ProxifyTestBase is Test {
         assertEq(instance.greeting(), initialGreeting);
     }
 
-    function assertGreeterV2(address proxy) internal view {
+    function assertGreeterV2(address proxy, bool isBeacon) internal {
         GreeterV2 instance = GreeterV2(proxy);
+        if (isBeacon) instance.resetGreeting();
         assertEq(instance.version(), 2);
         assertEq(instance.greeting(), "resetted");
     }
