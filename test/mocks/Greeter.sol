@@ -2,7 +2,6 @@
 pragma solidity ^0.8.20;
 
 import {Initializable} from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
-import {UUPSUpgradeable} from "@openzeppelin/contracts/proxy/utils/UUPSUpgradeable.sol";
 
 abstract contract GreeterStorage {
     address public owner;
@@ -69,12 +68,4 @@ contract GreeterV2 is GreeterStorage, Initializable {
     function version() external view returns (uint64) {
         return _getInitializedVersion();
     }
-}
-
-contract GreeterV1Proxiable is GreeterV1, UUPSUpgradeable {
-    function _authorizeUpgrade(address newImplementation) internal virtual override onlyOwner {}
-}
-
-contract GreeterV2Proxiable is GreeterV2, UUPSUpgradeable {
-    function _authorizeUpgrade(address newImplementation) internal virtual override onlyOwner {}
 }
