@@ -4,7 +4,9 @@ pragma solidity ^0.8.25;
 import {Vm} from "forge-std/Vm.sol";
 
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
+import {UUPSUpgradeable} from "@openzeppelin/contracts/proxy/utils/UUPSUpgradeable.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
+import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
 import {BeaconProxy} from "@openzeppelin/contracts/proxy/beacon/BeaconProxy.sol";
 import {UpgradeableBeacon} from "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
 
@@ -16,8 +18,8 @@ import {UpgradeableBeacon} from "@openzeppelin/contracts/proxy/beacon/Upgradeabl
 ///
 ///      Requires the Cancun EVM or later due to the use of the `MCOPY` opcode.
 ///
-///      `artifactPath` identifies an implementation contract by contract path or contract name,
-///      optionally qualified by a compiler version.
+///      `artifactPath` identifies an implementation by contract path or name, optionally
+///      qualified by a compiler version. A project-relative artifact path is also supported.
 ///
 ///      Supported contract identifier formats:
 ///
@@ -25,6 +27,9 @@ import {UpgradeableBeacon} from "@openzeppelin/contracts/proxy/beacon/Upgradeabl
 ///      - `"MyContract"`
 ///      - `"MyContract.sol:0.8.18"`
 ///      - `"MyContract:0.8.18"`
+///
+///      Upgrade overloads accepting `msgSender` are intended for use in Foundry tests;
+///      configure the transaction sender through Foundry when broadcasting scripts.
 library Proxify {
     /// @dev Thrown when the target address has no runtime code.
     /// @param target The address expected to contain runtime code.
@@ -76,6 +81,18 @@ library Proxify {
     ///      Derived as `bytes32(uint256(keccak256("eip1967.proxy.beacon")) - 1)`.
     bytes32 private constant BEACON_SLOT = 0xa3f0ad74e5423aebfd80d3ef4346578335a9a72aeaee59ff6cb3582b35133d50;
 
+    /// @dev Attempts to impersonate `msgSender` as `msg.sender` for the modified function.
+    ///      Executes the function with the original `msg.sender` if impersonation fails.
+    /// @param msgSender The address to impersonate as `msg.sender`.
+    modifier tryPrank(address msgSender) {
+        try vm.startPrank(msgSender) {
+            _;
+            vm.stopPrank();
+        } catch {
+            _;
+        }
+    }
+
     /// @notice Deploys a proxy backed by the given implementation.
     /// @dev Overload of {deployUUPSProxy} with `value` set to zero.
     /// @param implementation The address of the implementation to set in the proxy.
@@ -91,7 +108,7 @@ library Proxify {
     ///      that the implementation exposes a valid UUPS upgrade mechanism.
     /// @param implementation The address of the implementation to set in the proxy.
     /// @param initializerData The ABI-encoded calldata to execute during proxy initialization.
-    /// @param value The amount of Ether to forward during proxy construction.
+    /// @param value The amount of Ether to forward as `msg.value` during proxy construction.
     /// @return proxy The address of the deployed proxy.
     function deployUUPSProxy(address implementation, bytes memory initializerData, uint256 value)
         internal
@@ -125,7 +142,7 @@ library Proxify {
     /// @param implementation The address of the implementation to set in the proxy.
     /// @param initializerData The ABI-encoded calldata to execute during proxy initialization.
     /// @param salt The salt used for deterministic proxy deployment.
-    /// @param value The amount of Ether to forward during proxy construction.
+    /// @param value The amount of Ether to forward as `msg.value` during proxy construction.
     /// @return proxy The address of the deployed proxy.
     function deployUUPSProxy(address implementation, bytes memory initializerData, bytes32 salt, uint256 value)
         internal
@@ -142,7 +159,7 @@ library Proxify {
 
     /// @notice Deploys an implementation, then a proxy backed by it.
     /// @dev Overload of {deployUUPSProxy} with `constructorArgs` left empty and `value` set to zero.
-    /// @param artifactPath The Foundry artifact identifier for the implementation contract.
+    /// @param artifactPath The Foundry artifact identifier for the implementation.
     /// @param initializerData The ABI-encoded calldata to execute during proxy initialization.
     /// @return proxy The address of the deployed proxy.
     function deployUUPSProxy(string memory artifactPath, bytes memory initializerData)
@@ -156,9 +173,9 @@ library Proxify {
 
     /// @notice Deploys an implementation, then a proxy backed by it.
     /// @dev Overload of {deployUUPSProxy} with `constructorArgs` left empty.
-    /// @param artifactPath The Foundry artifact identifier for the implementation contract.
+    /// @param artifactPath The Foundry artifact identifier for the implementation.
     /// @param initializerData The ABI-encoded calldata to execute during proxy initialization.
-    /// @param value The amount of Ether to forward during proxy construction.
+    /// @param value The amount of Ether to forward as `msg.value` during proxy construction.
     /// @return proxy The address of the deployed proxy.
     function deployUUPSProxy(string memory artifactPath, bytes memory initializerData, uint256 value)
         internal
@@ -171,7 +188,7 @@ library Proxify {
 
     /// @notice Deploys an implementation, then a proxy backed by it.
     /// @dev Overload of {deployUUPSProxy} with `value` set to zero.
-    /// @param artifactPath The Foundry artifact identifier for the implementation contract.
+    /// @param artifactPath The Foundry artifact identifier for the implementation.
     /// @param constructorArgs The ABI-encoded constructor arguments for the implementation.
     /// @param initializerData The ABI-encoded calldata to execute during proxy initialization.
     /// @return proxy The address of the deployed proxy.
@@ -187,10 +204,10 @@ library Proxify {
     /// @notice Deploys an implementation, then a proxy backed by it.
     /// @dev Deploys the implementation and proxy using CREATE.
     ///      See {deployUUPSProxy-address-bytes-uint256}.
-    /// @param artifactPath The Foundry artifact identifier for the implementation contract.
+    /// @param artifactPath The Foundry artifact identifier for the implementation.
     /// @param constructorArgs The ABI-encoded constructor arguments for the implementation.
     /// @param initializerData The ABI-encoded calldata to execute during proxy initialization.
-    /// @param value The amount of Ether to forward during proxy construction.
+    /// @param value The amount of Ether to forward as `msg.value` during proxy construction.
     /// @return proxy The address of the deployed proxy.
     function deployUUPSProxy(
         string memory artifactPath,
@@ -205,7 +222,7 @@ library Proxify {
 
     /// @notice Deterministically deploys an implementation, then a proxy backed by it.
     /// @dev Overload of {deployUUPSProxy} with `constructorArgs` left empty and `value` set to zero.
-    /// @param artifactPath The Foundry artifact identifier for the implementation contract.
+    /// @param artifactPath The Foundry artifact identifier for the implementation.
     /// @param initializerData The ABI-encoded calldata to execute during proxy initialization.
     /// @param salt The salt used for deterministic implementation and proxy deployment.
     /// @return proxy The address of the deployed proxy.
@@ -220,10 +237,10 @@ library Proxify {
 
     /// @notice Deterministically deploys an implementation, then a proxy backed by it.
     /// @dev Overload of {deployUUPSProxy} with `constructorArgs` left empty.
-    /// @param artifactPath The Foundry artifact identifier for the implementation contract.
+    /// @param artifactPath The Foundry artifact identifier for the implementation.
     /// @param initializerData The ABI-encoded calldata to execute during proxy initialization.
     /// @param salt The salt used for deterministic implementation and proxy deployment.
-    /// @param value The amount of Ether to forward during proxy construction.
+    /// @param value The amount of Ether to forward as `msg.value` during proxy construction.
     /// @return proxy The address of the deployed proxy.
     function deployUUPSProxy(string memory artifactPath, bytes memory initializerData, bytes32 salt, uint256 value)
         internal
@@ -236,7 +253,7 @@ library Proxify {
 
     /// @notice Deterministically deploys an implementation, then a proxy backed by it.
     /// @dev Overload of {deployUUPSProxy} with `value` set to zero.
-    /// @param artifactPath The Foundry artifact identifier for the implementation contract.
+    /// @param artifactPath The Foundry artifact identifier for the implementation.
     /// @param constructorArgs The ABI-encoded constructor arguments for the implementation.
     /// @param initializerData The ABI-encoded calldata to execute during proxy initialization.
     /// @param salt The salt used for deterministic implementation and proxy deployment.
@@ -259,11 +276,11 @@ library Proxify {
     /// @notice Deterministically deploys an implementation, then a proxy backed by it.
     /// @dev Deploys the implementation and proxy using CREATE2 with the same salt.
     ///      See {deployUUPSProxy-address-bytes-bytes32-uint256}.
-    /// @param artifactPath The Foundry artifact identifier for the implementation contract.
+    /// @param artifactPath The Foundry artifact identifier for the implementation.
     /// @param constructorArgs The ABI-encoded constructor arguments for the implementation.
     /// @param initializerData The ABI-encoded calldata to execute during proxy initialization.
     /// @param salt The salt used for deterministic implementation and proxy deployment.
-    /// @param value The amount of Ether to forward during proxy construction.
+    /// @param value The amount of Ether to forward as `msg.value` during proxy construction.
     /// @return proxy The address of the deployed proxy.
     function deployUUPSProxy(
         string memory artifactPath,
@@ -297,7 +314,7 @@ library Proxify {
     /// @param proxy The address of the proxy to upgrade.
     /// @param implementation The address of the new implementation to set in the proxy.
     /// @param data The ABI-encoded calldata to execute during the upgrade.
-    /// @param value The amount of Ether to forward to the upgrade call.
+    /// @param value The amount of Ether to forward as `msg.value`.
     function upgradeUUPSProxy(address proxy, address implementation, bytes memory data, uint256 value) internal {
         _requireCode(proxy);
         _upgradeToAndCall(proxy, implementation, data, value);
@@ -307,7 +324,7 @@ library Proxify {
     /// @notice Deploys a new implementation, then upgrades the proxy to it.
     /// @dev Overload of {upgradeUUPSProxy} with `constructorArgs` left empty and `value` set to zero.
     /// @param proxy The address of the proxy to upgrade.
-    /// @param artifactPath The Foundry artifact identifier for the new implementation contract.
+    /// @param artifactPath The Foundry artifact identifier for the new implementation.
     /// @param data The ABI-encoded calldata to execute during the upgrade.
     function upgradeUUPSProxy(address proxy, string memory artifactPath, bytes memory data) internal {
         upgradeUUPSProxy({proxy: proxy, artifactPath: artifactPath, constructorArgs: "", data: data, value: 0});
@@ -316,9 +333,9 @@ library Proxify {
     /// @notice Deploys a new implementation, then upgrades the proxy to it.
     /// @dev Overload of {upgradeUUPSProxy} with `constructorArgs` left empty.
     /// @param proxy The address of the proxy to upgrade.
-    /// @param artifactPath The Foundry artifact identifier for the new implementation contract.
+    /// @param artifactPath The Foundry artifact identifier for the new implementation.
     /// @param data The ABI-encoded calldata to execute during the upgrade.
-    /// @param value The amount of Ether to forward to the upgrade call.
+    /// @param value The amount of Ether to forward as `msg.value`.
     function upgradeUUPSProxy(address proxy, string memory artifactPath, bytes memory data, uint256 value) internal {
         upgradeUUPSProxy({proxy: proxy, artifactPath: artifactPath, constructorArgs: "", data: data, value: value});
     }
@@ -326,7 +343,7 @@ library Proxify {
     /// @notice Deploys a new implementation, then upgrades the proxy to it.
     /// @dev Overload of {upgradeUUPSProxy} with `value` set to zero.
     /// @param proxy The address of the proxy to upgrade.
-    /// @param artifactPath The Foundry artifact identifier for the new implementation contract.
+    /// @param artifactPath The Foundry artifact identifier for the new implementation.
     /// @param constructorArgs The ABI-encoded constructor arguments for the new implementation.
     /// @param data The ABI-encoded calldata to execute during the upgrade.
     function upgradeUUPSProxy(
@@ -344,10 +361,10 @@ library Proxify {
     /// @dev Deploys the new implementation using CREATE, then upgrades the proxy.
     ///      See {upgradeUUPSProxy-address-address-bytes-uint256}.
     /// @param proxy The address of the proxy to upgrade.
-    /// @param artifactPath The Foundry artifact identifier for the new implementation contract.
+    /// @param artifactPath The Foundry artifact identifier for the new implementation.
     /// @param constructorArgs The ABI-encoded constructor arguments for the new implementation.
     /// @param data The ABI-encoded calldata to execute during the upgrade.
-    /// @param value The amount of Ether to forward to the upgrade call.
+    /// @param value The amount of Ether to forward as `msg.value`.
     function upgradeUUPSProxy(
         address proxy,
         string memory artifactPath,
@@ -363,7 +380,7 @@ library Proxify {
     /// @notice Deterministically deploys a new implementation, then upgrades the proxy to it.
     /// @dev Overload of {upgradeUUPSProxy} with `constructorArgs` left empty and `value` set to zero.
     /// @param proxy The address of the proxy to upgrade.
-    /// @param artifactPath The Foundry artifact identifier for the new implementation contract.
+    /// @param artifactPath The Foundry artifact identifier for the new implementation.
     /// @param data The ABI-encoded calldata to execute during the upgrade.
     /// @param salt The salt used for deterministic implementation deployment.
     function upgradeUUPSProxy(address proxy, string memory artifactPath, bytes memory data, bytes32 salt) internal {
@@ -375,10 +392,10 @@ library Proxify {
     /// @notice Deterministically deploys a new implementation, then upgrades the proxy to it.
     /// @dev Overload of {upgradeUUPSProxy} with `constructorArgs` left empty.
     /// @param proxy The address of the proxy to upgrade.
-    /// @param artifactPath The Foundry artifact identifier for the new implementation contract.
+    /// @param artifactPath The Foundry artifact identifier for the new implementation.
     /// @param data The ABI-encoded calldata to execute during the upgrade.
     /// @param salt The salt used for deterministic implementation deployment.
-    /// @param value The amount of Ether to forward to the upgrade call.
+    /// @param value The amount of Ether to forward as `msg.value`.
     function upgradeUUPSProxy(address proxy, string memory artifactPath, bytes memory data, bytes32 salt, uint256 value)
         internal
     {
@@ -390,7 +407,7 @@ library Proxify {
     /// @notice Deterministically deploys a new implementation, then upgrades the proxy to it.
     /// @dev Overload of {upgradeUUPSProxy} with `value` set to zero.
     /// @param proxy The address of the proxy to upgrade.
-    /// @param artifactPath The Foundry artifact identifier for the new implementation contract.
+    /// @param artifactPath The Foundry artifact identifier for the new implementation.
     /// @param constructorArgs The ABI-encoded constructor arguments for the new implementation.
     /// @param data The ABI-encoded calldata to execute during the upgrade.
     /// @param salt The salt used for deterministic implementation deployment.
@@ -410,11 +427,11 @@ library Proxify {
     /// @dev Deploys the new implementation using CREATE2, then upgrades the proxy.
     ///      See {upgradeUUPSProxy-address-address-bytes-uint256}.
     /// @param proxy The address of the proxy to upgrade.
-    /// @param artifactPath The Foundry artifact identifier for the new implementation contract.
+    /// @param artifactPath The Foundry artifact identifier for the new implementation.
     /// @param constructorArgs The ABI-encoded constructor arguments for the new implementation.
     /// @param data The ABI-encoded calldata to execute during the upgrade.
     /// @param salt The salt used for deterministic implementation deployment.
-    /// @param value The amount of Ether to forward to the upgrade call.
+    /// @param value The amount of Ether to forward as `msg.value`.
     function upgradeUUPSProxy(
         address proxy,
         string memory artifactPath,
@@ -425,6 +442,196 @@ library Proxify {
     ) internal {
         upgradeUUPSProxy({
             proxy: proxy, implementation: vm.deployCode(artifactPath, constructorArgs, salt), data: data, value: value
+        });
+    }
+
+    /// @notice Upgrades the proxy to the given implementation.
+    /// @dev Overload of {upgradeUUPSProxy} that attempts the upgrade as `msgSender`.
+    /// @param proxy The address of the proxy to upgrade.
+    /// @param implementation The address of the new implementation to set in the proxy.
+    /// @param data The ABI-encoded calldata to execute during the upgrade.
+    /// @param msgSender The address to impersonate as `msg.sender`.
+    function upgradeUUPSProxy(address proxy, address implementation, bytes memory data, address msgSender)
+        internal
+        tryPrank(msgSender)
+    {
+        upgradeUUPSProxy({proxy: proxy, implementation: implementation, data: data, value: 0});
+    }
+
+    /// @notice Upgrades the proxy to the given implementation.
+    /// @dev Overload of {upgradeUUPSProxy} that attempts the upgrade as `msgSender`.
+    ///      `msgSender` must be authorized by the current implementation.
+    /// @param proxy The address of the proxy to upgrade.
+    /// @param implementation The address of the new implementation to set in the proxy.
+    /// @param data The ABI-encoded calldata to execute during the upgrade.
+    /// @param value The amount of Ether to forward as `msg.value`.
+    /// @param msgSender The address to impersonate as `msg.sender`.
+    function upgradeUUPSProxy(
+        address proxy,
+        address implementation,
+        bytes memory data,
+        uint256 value,
+        address msgSender
+    ) internal tryPrank(msgSender) {
+        upgradeUUPSProxy({proxy: proxy, implementation: implementation, data: data, value: value});
+    }
+
+    /// @notice Deploys a new implementation, then upgrades the proxy to it.
+    /// @dev Overload of {upgradeUUPSProxy} that attempts the upgrade as `msgSender`.
+    /// @param proxy The address of the proxy to upgrade.
+    /// @param artifactPath The Foundry artifact identifier for the new implementation.
+    /// @param data The ABI-encoded calldata to execute during the upgrade.
+    /// @param msgSender The address to impersonate as `msg.sender`.
+    function upgradeUUPSProxy(address proxy, string memory artifactPath, bytes memory data, address msgSender)
+        internal
+        tryPrank(msgSender)
+    {
+        upgradeUUPSProxy({proxy: proxy, artifactPath: artifactPath, constructorArgs: "", data: data, value: 0});
+    }
+
+    /// @notice Deploys a new implementation, then upgrades the proxy to it.
+    /// @dev Overload of {upgradeUUPSProxy} that attempts the upgrade as `msgSender`.
+    /// @param proxy The address of the proxy to upgrade.
+    /// @param artifactPath The Foundry artifact identifier for the new implementation.
+    /// @param data The ABI-encoded calldata to execute during the upgrade.
+    /// @param value The amount of Ether to forward as `msg.value`.
+    /// @param msgSender The address to impersonate as `msg.sender`.
+    function upgradeUUPSProxy(
+        address proxy,
+        string memory artifactPath,
+        bytes memory data,
+        uint256 value,
+        address msgSender
+    ) internal tryPrank(msgSender) {
+        upgradeUUPSProxy({proxy: proxy, artifactPath: artifactPath, constructorArgs: "", data: data, value: value});
+    }
+
+    /// @notice Deploys a new implementation, then upgrades the proxy to it.
+    /// @dev Overload of {upgradeUUPSProxy} that attempts the upgrade as `msgSender`.
+    /// @param proxy The address of the proxy to upgrade.
+    /// @param artifactPath The Foundry artifact identifier for the new implementation.
+    /// @param constructorArgs The ABI-encoded constructor arguments for the new implementation.
+    /// @param data The ABI-encoded calldata to execute during the upgrade.
+    /// @param msgSender The address to impersonate as `msg.sender`.
+    function upgradeUUPSProxy(
+        address proxy,
+        string memory artifactPath,
+        bytes memory constructorArgs,
+        bytes memory data,
+        address msgSender
+    ) internal tryPrank(msgSender) {
+        upgradeUUPSProxy({
+            proxy: proxy, artifactPath: artifactPath, constructorArgs: constructorArgs, data: data, value: 0
+        });
+    }
+
+    /// @notice Deploys a new implementation, then upgrades the proxy to it.
+    /// @dev Overload of {upgradeUUPSProxy} that attempts the upgrade as `msgSender`.
+    /// @param proxy The address of the proxy to upgrade.
+    /// @param artifactPath The Foundry artifact identifier for the new implementation.
+    /// @param constructorArgs The ABI-encoded constructor arguments for the new implementation.
+    /// @param data The ABI-encoded calldata to execute during the upgrade.
+    /// @param value The amount of Ether to forward as `msg.value`.
+    /// @param msgSender The address to impersonate as `msg.sender`.
+    function upgradeUUPSProxy(
+        address proxy,
+        string memory artifactPath,
+        bytes memory constructorArgs,
+        bytes memory data,
+        uint256 value,
+        address msgSender
+    ) internal tryPrank(msgSender) {
+        upgradeUUPSProxy({
+            proxy: proxy, artifactPath: artifactPath, constructorArgs: constructorArgs, data: data, value: value
+        });
+    }
+
+    /// @notice Deterministically deploys a new implementation, then upgrades the proxy to it.
+    /// @dev Overload of {upgradeUUPSProxy} that attempts the upgrade as `msgSender`.
+    /// @param proxy The address of the proxy to upgrade.
+    /// @param artifactPath The Foundry artifact identifier for the new implementation.
+    /// @param data The ABI-encoded calldata to execute during the upgrade.
+    /// @param salt The salt used for deterministic implementation deployment.
+    /// @param msgSender The address to impersonate as `msg.sender`.
+    function upgradeUUPSProxy(
+        address proxy,
+        string memory artifactPath,
+        bytes memory data,
+        bytes32 salt,
+        address msgSender
+    ) internal tryPrank(msgSender) {
+        upgradeUUPSProxy({
+            proxy: proxy, artifactPath: artifactPath, constructorArgs: "", data: data, salt: salt, value: 0
+        });
+    }
+
+    /// @notice Deterministically deploys a new implementation, then upgrades the proxy to it.
+    /// @dev Overload of {upgradeUUPSProxy} that attempts the upgrade as `msgSender`.
+    /// @param proxy The address of the proxy to upgrade.
+    /// @param artifactPath The Foundry artifact identifier for the new implementation.
+    /// @param data The ABI-encoded calldata to execute during the upgrade.
+    /// @param salt The salt used for deterministic implementation deployment.
+    /// @param value The amount of Ether to forward as `msg.value`.
+    /// @param msgSender The address to impersonate as `msg.sender`.
+    function upgradeUUPSProxy(
+        address proxy,
+        string memory artifactPath,
+        bytes memory data,
+        bytes32 salt,
+        uint256 value,
+        address msgSender
+    ) internal tryPrank(msgSender) {
+        upgradeUUPSProxy({
+            proxy: proxy, artifactPath: artifactPath, constructorArgs: "", data: data, salt: salt, value: value
+        });
+    }
+
+    /// @notice Deterministically deploys a new implementation, then upgrades the proxy to it.
+    /// @dev Overload of {upgradeUUPSProxy} that attempts the upgrade as `msgSender`.
+    /// @param proxy The address of the proxy to upgrade.
+    /// @param artifactPath The Foundry artifact identifier for the new implementation.
+    /// @param constructorArgs The ABI-encoded constructor arguments for the new implementation.
+    /// @param data The ABI-encoded calldata to execute during the upgrade.
+    /// @param salt The salt used for deterministic implementation deployment.
+    /// @param msgSender The address to impersonate as `msg.sender`.
+    function upgradeUUPSProxy(
+        address proxy,
+        string memory artifactPath,
+        bytes memory constructorArgs,
+        bytes memory data,
+        bytes32 salt,
+        address msgSender
+    ) internal tryPrank(msgSender) {
+        upgradeUUPSProxy({
+            proxy: proxy, artifactPath: artifactPath, constructorArgs: constructorArgs, data: data, salt: salt, value: 0
+        });
+    }
+
+    /// @notice Deterministically deploys a new implementation, then upgrades the proxy to it.
+    /// @dev Overload of {upgradeUUPSProxy} that attempts the upgrade as `msgSender`.
+    /// @param proxy The address of the proxy to upgrade.
+    /// @param artifactPath The Foundry artifact identifier for the new implementation.
+    /// @param constructorArgs The ABI-encoded constructor arguments for the new implementation.
+    /// @param data The ABI-encoded calldata to execute during the upgrade.
+    /// @param salt The salt used for deterministic implementation deployment.
+    /// @param value The amount of Ether to forward as `msg.value`.
+    /// @param msgSender The address to impersonate as `msg.sender`.
+    function upgradeUUPSProxy(
+        address proxy,
+        string memory artifactPath,
+        bytes memory constructorArgs,
+        bytes memory data,
+        bytes32 salt,
+        uint256 value,
+        address msgSender
+    ) internal tryPrank(msgSender) {
+        upgradeUUPSProxy({
+            proxy: proxy,
+            artifactPath: artifactPath,
+            constructorArgs: constructorArgs,
+            data: data,
+            salt: salt,
+            value: value
         });
     }
 
@@ -450,7 +657,7 @@ library Proxify {
     /// @param implementation The address of the implementation to set in the proxy.
     /// @param initialOwner The address of the owner to assign to the proxy admin.
     /// @param initializerData The ABI-encoded calldata to execute during proxy initialization.
-    /// @param value The amount of Ether to forward during proxy construction.
+    /// @param value The amount of Ether to forward as `msg.value` during proxy construction.
     /// @return proxy The address of the deployed proxy.
     function deployTransparentProxy(
         address implementation,
@@ -463,11 +670,12 @@ library Proxify {
             constructorArgs: abi.encode(implementation, initialOwner, initializerData),
             value: value
         });
+        validateImplementation(proxy, implementation);
 
+        // ProxyAdmin is the first contract created by the proxy constructor.
         address admin = vm.computeCreateAddress(proxy, 1);
         validateAdmin(proxy, admin);
         validateOwner(admin, initialOwner);
-        validateImplementation(proxy, implementation);
     }
 
     /// @notice Deterministically deploys a proxy backed by the given implementation.
@@ -500,7 +708,7 @@ library Proxify {
     /// @param initialOwner The address of the owner to assign to the proxy admin.
     /// @param initializerData The ABI-encoded calldata to execute during proxy initialization.
     /// @param salt The salt used for deterministic proxy deployment.
-    /// @param value The amount of Ether to forward during proxy construction.
+    /// @param value The amount of Ether to forward as `msg.value` during proxy construction.
     /// @return proxy The address of the deployed proxy.
     function deployTransparentProxy(
         address implementation,
@@ -515,16 +723,17 @@ library Proxify {
             salt: salt,
             value: value
         });
+        validateImplementation(proxy, implementation);
 
+        // ProxyAdmin is the first contract created by the proxy constructor.
         address admin = vm.computeCreateAddress(proxy, 1);
         validateAdmin(proxy, admin);
         validateOwner(admin, initialOwner);
-        validateImplementation(proxy, implementation);
     }
 
     /// @notice Deploys an implementation, then a proxy backed by it.
     /// @dev Overload of {deployTransparentProxy} with `constructorArgs` left empty and `value` set to zero.
-    /// @param artifactPath The Foundry artifact identifier for the implementation contract.
+    /// @param artifactPath The Foundry artifact identifier for the implementation.
     /// @param initialOwner The address of the owner to assign to the proxy admin.
     /// @param initializerData The ABI-encoded calldata to execute during proxy initialization.
     /// @return proxy The address of the deployed proxy.
@@ -543,10 +752,10 @@ library Proxify {
 
     /// @notice Deploys an implementation, then a proxy backed by it.
     /// @dev Overload of {deployTransparentProxy} with `constructorArgs` left empty.
-    /// @param artifactPath The Foundry artifact identifier for the implementation contract.
+    /// @param artifactPath The Foundry artifact identifier for the implementation.
     /// @param initialOwner The address of the owner to assign to the proxy admin.
     /// @param initializerData The ABI-encoded calldata to execute during proxy initialization.
-    /// @param value The amount of Ether to forward during proxy construction.
+    /// @param value The amount of Ether to forward as `msg.value` during proxy construction.
     /// @return proxy The address of the deployed proxy.
     function deployTransparentProxy(
         string memory artifactPath,
@@ -565,7 +774,7 @@ library Proxify {
 
     /// @notice Deploys an implementation, then a proxy backed by it.
     /// @dev Overload of {deployTransparentProxy} with `value` set to zero.
-    /// @param artifactPath The Foundry artifact identifier for the implementation contract.
+    /// @param artifactPath The Foundry artifact identifier for the implementation.
     /// @param constructorArgs The ABI-encoded constructor arguments for the implementation.
     /// @param initialOwner The address of the owner to assign to the proxy admin.
     /// @param initializerData The ABI-encoded calldata to execute during proxy initialization.
@@ -588,11 +797,11 @@ library Proxify {
     /// @notice Deploys an implementation, then a proxy backed by it.
     /// @dev Deploys the implementation and proxy using CREATE.
     ///      See {deployTransparentProxy-address-address-bytes-uint256}.
-    /// @param artifactPath The Foundry artifact identifier for the implementation contract.
+    /// @param artifactPath The Foundry artifact identifier for the implementation.
     /// @param constructorArgs The ABI-encoded constructor arguments for the implementation.
     /// @param initialOwner The address of the owner to assign to the proxy admin.
     /// @param initializerData The ABI-encoded calldata to execute during proxy initialization.
-    /// @param value The amount of Ether to forward during proxy construction.
+    /// @param value The amount of Ether to forward as `msg.value` during proxy construction.
     /// @return proxy The address of the deployed proxy.
     function deployTransparentProxy(
         string memory artifactPath,
@@ -611,7 +820,7 @@ library Proxify {
 
     /// @notice Deterministically deploys an implementation, then a proxy backed by it.
     /// @dev Overload of {deployTransparentProxy} with `constructorArgs` left empty and `value` set to zero.
-    /// @param artifactPath The Foundry artifact identifier for the implementation contract.
+    /// @param artifactPath The Foundry artifact identifier for the implementation.
     /// @param initialOwner The address of the owner to assign to the proxy admin.
     /// @param initializerData The ABI-encoded calldata to execute during proxy initialization.
     /// @param salt The salt used for deterministic implementation and proxy deployment.
@@ -634,11 +843,11 @@ library Proxify {
 
     /// @notice Deterministically deploys an implementation, then a proxy backed by it.
     /// @dev Overload of {deployTransparentProxy} with `constructorArgs` left empty.
-    /// @param artifactPath The Foundry artifact identifier for the implementation contract.
+    /// @param artifactPath The Foundry artifact identifier for the implementation.
     /// @param initialOwner The address of the owner to assign to the proxy admin.
     /// @param initializerData The ABI-encoded calldata to execute during proxy initialization.
     /// @param salt The salt used for deterministic implementation and proxy deployment.
-    /// @param value The amount of Ether to forward during proxy construction.
+    /// @param value The amount of Ether to forward as `msg.value` during proxy construction.
     /// @return proxy The address of the deployed proxy.
     function deployTransparentProxy(
         string memory artifactPath,
@@ -659,7 +868,7 @@ library Proxify {
 
     /// @notice Deterministically deploys an implementation, then a proxy backed by it.
     /// @dev Overload of {deployTransparentProxy} with `value` set to zero.
-    /// @param artifactPath The Foundry artifact identifier for the implementation contract.
+    /// @param artifactPath The Foundry artifact identifier for the implementation.
     /// @param constructorArgs The ABI-encoded constructor arguments for the implementation.
     /// @param initialOwner The address of the owner to assign to the proxy admin.
     /// @param initializerData The ABI-encoded calldata to execute during proxy initialization.
@@ -685,12 +894,12 @@ library Proxify {
     /// @notice Deterministically deploys an implementation, then a proxy backed by it.
     /// @dev Deploys the implementation and proxy using CREATE2 with the same salt.
     ///      See {deployTransparentProxy-address-address-bytes-bytes32-uint256}.
-    /// @param artifactPath The Foundry artifact identifier for the implementation contract.
+    /// @param artifactPath The Foundry artifact identifier for the implementation.
     /// @param constructorArgs The ABI-encoded constructor arguments for the implementation.
     /// @param initialOwner The address of the owner to assign to the proxy admin.
     /// @param initializerData The ABI-encoded calldata to execute during proxy initialization.
     /// @param salt The salt used for deterministic implementation and proxy deployment.
-    /// @param value The amount of Ether to forward during proxy construction.
+    /// @param value The amount of Ether to forward as `msg.value` during proxy construction.
     /// @return proxy The address of the deployed proxy.
     function deployTransparentProxy(
         string memory artifactPath,
@@ -724,7 +933,7 @@ library Proxify {
     /// @param proxy The address of the proxy to upgrade.
     /// @param implementation The address of the new implementation to set in the proxy.
     /// @param data The ABI-encoded calldata to execute during the upgrade.
-    /// @param value The amount of Ether to forward to the upgrade call.
+    /// @param value The amount of Ether to forward as `msg.value`.
     function upgradeTransparentProxy(address proxy, address implementation, bytes memory data, uint256 value) internal {
         _requireCode(proxy);
         address admin = getAdmin(proxy);
@@ -736,7 +945,7 @@ library Proxify {
     /// @notice Deploys a new implementation, then upgrades the proxy to it.
     /// @dev Overload of {upgradeTransparentProxy} with `constructorArgs` left empty and `value` set to zero.
     /// @param proxy The address of the proxy to upgrade.
-    /// @param artifactPath The Foundry artifact identifier for the new implementation contract.
+    /// @param artifactPath The Foundry artifact identifier for the new implementation.
     /// @param data The ABI-encoded calldata to execute during the upgrade.
     function upgradeTransparentProxy(address proxy, string memory artifactPath, bytes memory data) internal {
         upgradeTransparentProxy({proxy: proxy, artifactPath: artifactPath, constructorArgs: "", data: data, value: 0});
@@ -745,9 +954,9 @@ library Proxify {
     /// @notice Deploys a new implementation, then upgrades the proxy to it.
     /// @dev Overload of {upgradeTransparentProxy} with `constructorArgs` left empty.
     /// @param proxy The address of the proxy to upgrade.
-    /// @param artifactPath The Foundry artifact identifier for the new implementation contract.
+    /// @param artifactPath The Foundry artifact identifier for the new implementation.
     /// @param data The ABI-encoded calldata to execute during the upgrade.
-    /// @param value The amount of Ether to forward to the upgrade call.
+    /// @param value The amount of Ether to forward as `msg.value`.
     function upgradeTransparentProxy(address proxy, string memory artifactPath, bytes memory data, uint256 value)
         internal
     {
@@ -759,7 +968,7 @@ library Proxify {
     /// @notice Deploys a new implementation, then upgrades the proxy to it.
     /// @dev Overload of {upgradeTransparentProxy} with `value` set to zero.
     /// @param proxy The address of the proxy to upgrade.
-    /// @param artifactPath The Foundry artifact identifier for the new implementation contract.
+    /// @param artifactPath The Foundry artifact identifier for the new implementation.
     /// @param constructorArgs The ABI-encoded constructor arguments for the new implementation.
     /// @param data The ABI-encoded calldata to execute during the upgrade.
     function upgradeTransparentProxy(
@@ -777,10 +986,10 @@ library Proxify {
     /// @dev Deploys the new implementation using CREATE, then upgrades the proxy.
     ///      See {upgradeTransparentProxy-address-address-bytes-uint256}.
     /// @param proxy The address of the proxy to upgrade.
-    /// @param artifactPath The Foundry artifact identifier for the new implementation contract.
+    /// @param artifactPath The Foundry artifact identifier for the new implementation.
     /// @param constructorArgs The ABI-encoded constructor arguments for the new implementation.
     /// @param data The ABI-encoded calldata to execute during the upgrade.
-    /// @param value The amount of Ether to forward to the upgrade call.
+    /// @param value The amount of Ether to forward as `msg.value`.
     function upgradeTransparentProxy(
         address proxy,
         string memory artifactPath,
@@ -796,7 +1005,7 @@ library Proxify {
     /// @notice Deterministically deploys a new implementation, then upgrades the proxy to it.
     /// @dev Overload of {upgradeTransparentProxy} with `constructorArgs` left empty and `value` set to zero.
     /// @param proxy The address of the proxy to upgrade.
-    /// @param artifactPath The Foundry artifact identifier for the new implementation contract.
+    /// @param artifactPath The Foundry artifact identifier for the new implementation.
     /// @param data The ABI-encoded calldata to execute during the upgrade.
     /// @param salt The salt used for deterministic implementation deployment.
     function upgradeTransparentProxy(address proxy, string memory artifactPath, bytes memory data, bytes32 salt)
@@ -810,10 +1019,10 @@ library Proxify {
     /// @notice Deterministically deploys a new implementation, then upgrades the proxy to it.
     /// @dev Overload of {upgradeTransparentProxy} with `constructorArgs` left empty.
     /// @param proxy The address of the proxy to upgrade.
-    /// @param artifactPath The Foundry artifact identifier for the new implementation contract.
+    /// @param artifactPath The Foundry artifact identifier for the new implementation.
     /// @param data The ABI-encoded calldata to execute during the upgrade.
     /// @param salt The salt used for deterministic implementation deployment.
-    /// @param value The amount of Ether to forward to the upgrade call.
+    /// @param value The amount of Ether to forward as `msg.value`.
     function upgradeTransparentProxy(
         address proxy,
         string memory artifactPath,
@@ -829,7 +1038,7 @@ library Proxify {
     /// @notice Deterministically deploys a new implementation, then upgrades the proxy to it.
     /// @dev Overload of {upgradeTransparentProxy} with `value` set to zero.
     /// @param proxy The address of the proxy to upgrade.
-    /// @param artifactPath The Foundry artifact identifier for the new implementation contract.
+    /// @param artifactPath The Foundry artifact identifier for the new implementation.
     /// @param constructorArgs The ABI-encoded constructor arguments for the new implementation.
     /// @param data The ABI-encoded calldata to execute during the upgrade.
     /// @param salt The salt used for deterministic implementation deployment.
@@ -849,11 +1058,11 @@ library Proxify {
     /// @dev Deploys the new implementation using CREATE2, then upgrades the proxy.
     ///      See {upgradeTransparentProxy-address-address-bytes-uint256}.
     /// @param proxy The address of the proxy to upgrade.
-    /// @param artifactPath The Foundry artifact identifier for the new implementation contract.
+    /// @param artifactPath The Foundry artifact identifier for the new implementation.
     /// @param constructorArgs The ABI-encoded constructor arguments for the new implementation.
     /// @param data The ABI-encoded calldata to execute during the upgrade.
     /// @param salt The salt used for deterministic implementation deployment.
-    /// @param value The amount of Ether to forward to the upgrade call.
+    /// @param value The amount of Ether to forward as `msg.value`.
     function upgradeTransparentProxy(
         address proxy,
         string memory artifactPath,
@@ -864,6 +1073,198 @@ library Proxify {
     ) internal {
         upgradeTransparentProxy({
             proxy: proxy, implementation: vm.deployCode(artifactPath, constructorArgs, salt), data: data, value: value
+        });
+    }
+
+    /// @notice Upgrades the proxy to the given implementation.
+    /// @dev Overload of {upgradeTransparentProxy} that attempts the upgrade as `msgSender`.
+    /// @param proxy The address of the proxy to upgrade.
+    /// @param implementation The address of the new implementation to set in the proxy.
+    /// @param data The ABI-encoded calldata to execute during the upgrade.
+    /// @param msgSender The address to impersonate as `msg.sender`.
+    function upgradeTransparentProxy(address proxy, address implementation, bytes memory data, address msgSender)
+        internal
+        tryPrank(msgSender)
+    {
+        upgradeTransparentProxy({proxy: proxy, implementation: implementation, data: data});
+    }
+
+    /// @notice Upgrades the proxy to the given implementation.
+    /// @dev Overload of {upgradeTransparentProxy} that attempts the upgrade as `msgSender`.
+    ///      `msgSender` must be the owner of the associated proxy admin.
+    /// @param proxy The address of the proxy to upgrade.
+    /// @param implementation The address of the new implementation to set in the proxy.
+    /// @param data The ABI-encoded calldata to execute during the upgrade.
+    /// @param value The amount of Ether to forward as `msg.value`.
+    /// @param msgSender The address to impersonate as `msg.sender`.
+    function upgradeTransparentProxy(
+        address proxy,
+        address implementation,
+        bytes memory data,
+        uint256 value,
+        address msgSender
+    ) internal tryPrank(msgSender) {
+        upgradeTransparentProxy({proxy: proxy, implementation: implementation, data: data, value: value});
+    }
+
+    /// @notice Deploys a new implementation, then upgrades the proxy to it.
+    /// @dev Overload of {upgradeTransparentProxy} that attempts the upgrade as `msgSender`.
+    /// @param proxy The address of the proxy to upgrade.
+    /// @param artifactPath The Foundry artifact identifier for the new implementation.
+    /// @param data The ABI-encoded calldata to execute during the upgrade.
+    /// @param msgSender The address to impersonate as `msg.sender`.
+    function upgradeTransparentProxy(address proxy, string memory artifactPath, bytes memory data, address msgSender)
+        internal
+        tryPrank(msgSender)
+    {
+        upgradeTransparentProxy({proxy: proxy, artifactPath: artifactPath, constructorArgs: "", data: data, value: 0});
+    }
+
+    /// @notice Deploys a new implementation, then upgrades the proxy to it.
+    /// @dev Overload of {upgradeTransparentProxy} that attempts the upgrade as `msgSender`.
+    /// @param proxy The address of the proxy to upgrade.
+    /// @param artifactPath The Foundry artifact identifier for the new implementation.
+    /// @param data The ABI-encoded calldata to execute during the upgrade.
+    /// @param value The amount of Ether to forward as `msg.value`.
+    /// @param msgSender The address to impersonate as `msg.sender`.
+    function upgradeTransparentProxy(
+        address proxy,
+        string memory artifactPath,
+        bytes memory data,
+        uint256 value,
+        address msgSender
+    ) internal tryPrank(msgSender) {
+        upgradeTransparentProxy({
+            proxy: proxy, artifactPath: artifactPath, constructorArgs: "", data: data, value: value
+        });
+    }
+
+    /// @notice Deploys a new implementation, then upgrades the proxy to it.
+    /// @dev Overload of {upgradeTransparentProxy} that attempts the upgrade as `msgSender`.
+    /// @param proxy The address of the proxy to upgrade.
+    /// @param artifactPath The Foundry artifact identifier for the new implementation.
+    /// @param constructorArgs The ABI-encoded constructor arguments for the new implementation.
+    /// @param data The ABI-encoded calldata to execute during the upgrade.
+    /// @param msgSender The address to impersonate as `msg.sender`.
+    function upgradeTransparentProxy(
+        address proxy,
+        string memory artifactPath,
+        bytes memory constructorArgs,
+        bytes memory data,
+        address msgSender
+    ) internal tryPrank(msgSender) {
+        upgradeTransparentProxy({
+            proxy: proxy, artifactPath: artifactPath, constructorArgs: constructorArgs, data: data, value: 0
+        });
+    }
+
+    /// @notice Deploys a new implementation, then upgrades the proxy to it.
+    /// @dev Overload of {upgradeTransparentProxy} that attempts the upgrade as `msgSender`.
+    /// @param proxy The address of the proxy to upgrade.
+    /// @param artifactPath The Foundry artifact identifier for the new implementation.
+    /// @param constructorArgs The ABI-encoded constructor arguments for the new implementation.
+    /// @param data The ABI-encoded calldata to execute during the upgrade.
+    /// @param value The amount of Ether to forward as `msg.value`.
+    /// @param msgSender The address to impersonate as `msg.sender`.
+    function upgradeTransparentProxy(
+        address proxy,
+        string memory artifactPath,
+        bytes memory constructorArgs,
+        bytes memory data,
+        uint256 value,
+        address msgSender
+    ) internal tryPrank(msgSender) {
+        upgradeTransparentProxy({
+            proxy: proxy, artifactPath: artifactPath, constructorArgs: constructorArgs, data: data, value: value
+        });
+    }
+
+    /// @notice Deterministically deploys a new implementation, then upgrades the proxy to it.
+    /// @dev Overload of {upgradeTransparentProxy} that attempts the upgrade as `msgSender`.
+    /// @param proxy The address of the proxy to upgrade.
+    /// @param artifactPath The Foundry artifact identifier for the new implementation.
+    /// @param data The ABI-encoded calldata to execute during the upgrade.
+    /// @param salt The salt used for deterministic implementation deployment.
+    /// @param msgSender The address to impersonate as `msg.sender`.
+    function upgradeTransparentProxy(
+        address proxy,
+        string memory artifactPath,
+        bytes memory data,
+        bytes32 salt,
+        address msgSender
+    ) internal tryPrank(msgSender) {
+        upgradeTransparentProxy({
+            proxy: proxy, artifactPath: artifactPath, constructorArgs: "", data: data, salt: salt, value: 0
+        });
+    }
+
+    /// @notice Deterministically deploys a new implementation, then upgrades the proxy to it.
+    /// @dev Overload of {upgradeTransparentProxy} that attempts the upgrade as `msgSender`.
+    /// @param proxy The address of the proxy to upgrade.
+    /// @param artifactPath The Foundry artifact identifier for the new implementation.
+    /// @param data The ABI-encoded calldata to execute during the upgrade.
+    /// @param salt The salt used for deterministic implementation deployment.
+    /// @param value The amount of Ether to forward as `msg.value`.
+    /// @param msgSender The address to impersonate as `msg.sender`.
+    function upgradeTransparentProxy(
+        address proxy,
+        string memory artifactPath,
+        bytes memory data,
+        bytes32 salt,
+        uint256 value,
+        address msgSender
+    ) internal tryPrank(msgSender) {
+        upgradeTransparentProxy({
+            proxy: proxy, artifactPath: artifactPath, constructorArgs: "", data: data, salt: salt, value: value
+        });
+    }
+
+    /// @notice Deterministically deploys a new implementation, then upgrades the proxy to it.
+    /// @dev Overload of {upgradeTransparentProxy} that attempts the upgrade as `msgSender`.
+    /// @param proxy The address of the proxy to upgrade.
+    /// @param artifactPath The Foundry artifact identifier for the new implementation.
+    /// @param constructorArgs The ABI-encoded constructor arguments for the new implementation.
+    /// @param data The ABI-encoded calldata to execute during the upgrade.
+    /// @param salt The salt used for deterministic implementation deployment.
+    /// @param msgSender The address to impersonate as `msg.sender`.
+    function upgradeTransparentProxy(
+        address proxy,
+        string memory artifactPath,
+        bytes memory constructorArgs,
+        bytes memory data,
+        bytes32 salt,
+        address msgSender
+    ) internal tryPrank(msgSender) {
+        upgradeTransparentProxy({
+            proxy: proxy, artifactPath: artifactPath, constructorArgs: constructorArgs, data: data, salt: salt, value: 0
+        });
+    }
+
+    /// @notice Deterministically deploys a new implementation, then upgrades the proxy to it.
+    /// @dev Overload of {upgradeTransparentProxy} that attempts the upgrade as `msgSender`.
+    /// @param proxy The address of the proxy to upgrade.
+    /// @param artifactPath The Foundry artifact identifier for the new implementation.
+    /// @param constructorArgs The ABI-encoded constructor arguments for the new implementation.
+    /// @param data The ABI-encoded calldata to execute during the upgrade.
+    /// @param salt The salt used for deterministic implementation deployment.
+    /// @param value The amount of Ether to forward as `msg.value`.
+    /// @param msgSender The address to impersonate as `msg.sender`.
+    function upgradeTransparentProxy(
+        address proxy,
+        string memory artifactPath,
+        bytes memory constructorArgs,
+        bytes memory data,
+        bytes32 salt,
+        uint256 value,
+        address msgSender
+    ) internal tryPrank(msgSender) {
+        upgradeTransparentProxy({
+            proxy: proxy,
+            artifactPath: artifactPath,
+            constructorArgs: constructorArgs,
+            data: data,
+            salt: salt,
+            value: value
         });
     }
 
@@ -902,7 +1303,7 @@ library Proxify {
 
     /// @notice Deploys an implementation, then a beacon backed by it.
     /// @dev Overload of {deployBeacon} with `constructorArgs` left empty.
-    /// @param artifactPath The Foundry artifact identifier for the implementation contract.
+    /// @param artifactPath The Foundry artifact identifier for the implementation.
     /// @param initialOwner The address of the owner to set in the beacon.
     /// @return beacon The address of the deployed beacon.
     function deployBeacon(string memory artifactPath, address initialOwner) internal returns (address beacon) {
@@ -912,7 +1313,7 @@ library Proxify {
     /// @notice Deploys an implementation, then a beacon backed by it.
     /// @dev Deploys the implementation and beacon using CREATE.
     ///      See {deployBeacon-address-address}.
-    /// @param artifactPath The Foundry artifact identifier for the implementation contract.
+    /// @param artifactPath The Foundry artifact identifier for the implementation.
     /// @param constructorArgs The ABI-encoded constructor arguments for the implementation.
     /// @param initialOwner The address of the owner to set in the beacon.
     /// @return beacon The address of the deployed beacon.
@@ -925,7 +1326,7 @@ library Proxify {
 
     /// @notice Deterministically deploys an implementation, then a beacon backed by it.
     /// @dev Overload of {deployBeacon} with `constructorArgs` left empty.
-    /// @param artifactPath The Foundry artifact identifier for the implementation contract.
+    /// @param artifactPath The Foundry artifact identifier for the implementation.
     /// @param initialOwner The address of the owner to set in the beacon.
     /// @param salt The salt used for deterministic implementation and beacon deployment.
     /// @return beacon The address of the deployed beacon.
@@ -939,7 +1340,7 @@ library Proxify {
     /// @notice Deterministically deploys an implementation, then a beacon backed by it.
     /// @dev Deploys the implementation and beacon using CREATE2 with the same salt.
     ///      See {deployBeacon-address-address-bytes32}.
-    /// @param artifactPath The Foundry artifact identifier for the implementation contract.
+    /// @param artifactPath The Foundry artifact identifier for the implementation.
     /// @param constructorArgs The ABI-encoded constructor arguments for the implementation.
     /// @param initialOwner The address of the owner to set in the beacon.
     /// @param salt The salt used for deterministic implementation and beacon deployment.
@@ -963,11 +1364,10 @@ library Proxify {
     }
 
     /// @notice Deploys a proxy backed by the given beacon.
-    /// @dev Deploys a {BeaconProxy} using CREATE while forwarding Ether, and verifies
-    ///      the resulting ERC-1967 beacon slot.
+    /// @dev Deploys a {BeaconProxy} using CREATE while forwarding Ether, and verifies the resulting ERC-1967 beacon slot.
     /// @param beacon The address of the beacon to set in the proxy.
     /// @param initializerData The ABI-encoded calldata to execute during proxy initialization.
-    /// @param value The amount of Ether to forward during proxy construction.
+    /// @param value The amount of Ether to forward as `msg.value` during proxy construction.
     /// @return proxy The address of the deployed proxy.
     function deployBeaconProxy(address beacon, bytes memory initializerData, uint256 value)
         internal
@@ -995,12 +1395,11 @@ library Proxify {
     }
 
     /// @notice Deterministically deploys a proxy backed by the given beacon.
-    /// @dev Deploys a {BeaconProxy} using CREATE2 while forwarding Ether, and verifies
-    ///      the resulting ERC-1967 beacon slot.
+    /// @dev Deploys a {BeaconProxy} using CREATE2 while forwarding Ether, and verifies the resulting ERC-1967 beacon slot.
     /// @param beacon The address of the beacon to set in the proxy.
     /// @param initializerData The ABI-encoded calldata to execute during proxy initialization.
     /// @param salt The salt used for deterministic proxy deployment.
-    /// @param value The amount of Ether to forward during proxy construction.
+    /// @param value The amount of Ether to forward as `msg.value` during proxy construction.
     /// @return proxy The address of the deployed proxy.
     function deployBeaconProxy(address beacon, bytes memory initializerData, bytes32 salt, uint256 value)
         internal
@@ -1017,7 +1416,7 @@ library Proxify {
 
     /// @notice Deploys an implementation, then a beacon backed by it and a proxy backed by the beacon.
     /// @dev Overload of {deployBeaconProxy} with `constructorArgs` left empty and `value` set to zero.
-    /// @param artifactPath The Foundry artifact identifier for the implementation contract.
+    /// @param artifactPath The Foundry artifact identifier for the implementation.
     /// @param initialOwner The address of the owner to set in the beacon.
     /// @param initializerData The ABI-encoded calldata to execute during proxy initialization.
     /// @return proxy The address of the deployed proxy.
@@ -1036,10 +1435,10 @@ library Proxify {
 
     /// @notice Deploys an implementation, then a beacon backed by it and a proxy backed by the beacon.
     /// @dev Overload of {deployBeaconProxy} with `constructorArgs` left empty.
-    /// @param artifactPath The Foundry artifact identifier for the implementation contract.
+    /// @param artifactPath The Foundry artifact identifier for the implementation.
     /// @param initialOwner The address of the owner to set in the beacon.
     /// @param initializerData The ABI-encoded calldata to execute during proxy initialization.
-    /// @param value The amount of Ether to forward during proxy construction.
+    /// @param value The amount of Ether to forward as `msg.value` during proxy construction.
     /// @return proxy The address of the deployed proxy.
     function deployBeaconProxy(
         string memory artifactPath,
@@ -1058,7 +1457,7 @@ library Proxify {
 
     /// @notice Deploys an implementation, then a beacon backed by it and a proxy backed by the beacon.
     /// @dev Overload of {deployBeaconProxy} with `value` set to zero.
-    /// @param artifactPath The Foundry artifact identifier for the implementation contract.
+    /// @param artifactPath The Foundry artifact identifier for the implementation.
     /// @param constructorArgs The ABI-encoded constructor arguments for the implementation.
     /// @param initialOwner The address of the owner to set in the beacon.
     /// @param initializerData The ABI-encoded calldata to execute during proxy initialization.
@@ -1081,11 +1480,11 @@ library Proxify {
     /// @notice Deploys an implementation, then a beacon backed by it and a proxy backed by the beacon.
     /// @dev Deploys the implementation, beacon, and proxy using CREATE.
     ///      See {deployBeaconProxy-address-bytes-uint256}.
-    /// @param artifactPath The Foundry artifact identifier for the implementation contract.
+    /// @param artifactPath The Foundry artifact identifier for the implementation.
     /// @param constructorArgs The ABI-encoded constructor arguments for the implementation.
     /// @param initialOwner The address of the owner to set in the beacon.
     /// @param initializerData The ABI-encoded calldata to execute during proxy initialization.
-    /// @param value The amount of Ether to forward during proxy construction.
+    /// @param value The amount of Ether to forward as `msg.value` during proxy construction.
     /// @return proxy The address of the deployed proxy.
     function deployBeaconProxy(
         string memory artifactPath,
@@ -1103,7 +1502,7 @@ library Proxify {
 
     /// @notice Deterministically deploys an implementation, then a beacon backed by it and a proxy backed by the beacon.
     /// @dev Overload of {deployBeaconProxy} with `constructorArgs` left empty and `value` set to zero.
-    /// @param artifactPath The Foundry artifact identifier for the implementation contract.
+    /// @param artifactPath The Foundry artifact identifier for the implementation.
     /// @param initialOwner The address of the owner to set in the beacon.
     /// @param initializerData The ABI-encoded calldata to execute during proxy initialization.
     /// @param salt The salt used for deterministic implementation, beacon, and proxy deployment.
@@ -1126,11 +1525,11 @@ library Proxify {
 
     /// @notice Deterministically deploys an implementation, then a beacon backed by it and a proxy backed by the beacon.
     /// @dev Overload of {deployBeaconProxy} with `constructorArgs` left empty.
-    /// @param artifactPath The Foundry artifact identifier for the implementation contract.
+    /// @param artifactPath The Foundry artifact identifier for the implementation.
     /// @param initialOwner The address of the owner to set in the beacon.
     /// @param initializerData The ABI-encoded calldata to execute during proxy initialization.
     /// @param salt The salt used for deterministic implementation, beacon, and proxy deployment.
-    /// @param value The amount of Ether to forward during proxy construction.
+    /// @param value The amount of Ether to forward as `msg.value` during proxy construction.
     /// @return proxy The address of the deployed proxy.
     function deployBeaconProxy(
         string memory artifactPath,
@@ -1151,7 +1550,7 @@ library Proxify {
 
     /// @notice Deterministically deploys an implementation, then a beacon backed by it and a proxy backed by the beacon.
     /// @dev Overload of {deployBeaconProxy} with `value` set to zero.
-    /// @param artifactPath The Foundry artifact identifier for the implementation contract.
+    /// @param artifactPath The Foundry artifact identifier for the implementation.
     /// @param constructorArgs The ABI-encoded constructor arguments for the implementation.
     /// @param initialOwner The address of the owner to set in the beacon.
     /// @param initializerData The ABI-encoded calldata to execute during proxy initialization.
@@ -1177,12 +1576,12 @@ library Proxify {
     /// @notice Deterministically deploys an implementation, then a beacon backed by it and a proxy backed by the beacon.
     /// @dev Deploys the implementation, beacon, and proxy using CREATE2 with the same salt.
     ///      See {deployBeaconProxy-address-bytes-bytes32-uint256}.
-    /// @param artifactPath The Foundry artifact identifier for the implementation contract.
+    /// @param artifactPath The Foundry artifact identifier for the implementation.
     /// @param constructorArgs The ABI-encoded constructor arguments for the implementation.
     /// @param initialOwner The address of the owner to set in the beacon.
     /// @param initializerData The ABI-encoded calldata to execute during proxy initialization.
     /// @param salt The salt used for deterministic implementation, beacon, and proxy deployment.
-    /// @param value The amount of Ether to forward during proxy construction.
+    /// @param value The amount of Ether to forward as `msg.value` during proxy construction.
     /// @return proxy The address of the deployed proxy.
     function deployBeaconProxy(
         string memory artifactPath,
@@ -1213,7 +1612,7 @@ library Proxify {
     /// @notice Deploys a new implementation, then upgrades the beacon to it.
     /// @dev Overload of {upgradeBeacon} with `constructorArgs` left empty.
     /// @param beacon The address of the beacon to upgrade.
-    /// @param artifactPath The Foundry artifact identifier for the new implementation contract.
+    /// @param artifactPath The Foundry artifact identifier for the new implementation.
     function upgradeBeacon(address beacon, string memory artifactPath) internal {
         upgradeBeacon({beacon: beacon, artifactPath: artifactPath, constructorArgs: ""});
     }
@@ -1222,7 +1621,7 @@ library Proxify {
     /// @dev Deploys the new implementation using CREATE, then upgrades the beacon.
     ///      See {upgradeBeacon-address-address}.
     /// @param beacon The address of the beacon to upgrade.
-    /// @param artifactPath The Foundry artifact identifier for the new implementation contract.
+    /// @param artifactPath The Foundry artifact identifier for the new implementation.
     /// @param constructorArgs The ABI-encoded constructor arguments for the new implementation.
     function upgradeBeacon(address beacon, string memory artifactPath, bytes memory constructorArgs) internal {
         upgradeBeacon({beacon: beacon, implementation: vm.deployCode(artifactPath, constructorArgs)});
@@ -1231,7 +1630,7 @@ library Proxify {
     /// @notice Deterministically deploys a new implementation, then upgrades the beacon to it.
     /// @dev Overload of {upgradeBeacon} with `constructorArgs` left empty.
     /// @param beacon The address of the beacon to upgrade.
-    /// @param artifactPath The Foundry artifact identifier for the new implementation contract.
+    /// @param artifactPath The Foundry artifact identifier for the new implementation.
     /// @param salt The salt used for deterministic implementation deployment.
     function upgradeBeacon(address beacon, string memory artifactPath, bytes32 salt) internal {
         upgradeBeacon({beacon: beacon, artifactPath: artifactPath, constructorArgs: "", salt: salt});
@@ -1241,13 +1640,75 @@ library Proxify {
     /// @dev Deploys the new implementation using CREATE2, then upgrades the beacon.
     ///      See {upgradeBeacon-address-address}.
     /// @param beacon The address of the beacon to upgrade.
-    /// @param artifactPath The Foundry artifact identifier for the new implementation contract.
+    /// @param artifactPath The Foundry artifact identifier for the new implementation.
     /// @param constructorArgs The ABI-encoded constructor arguments for the new implementation.
     /// @param salt The salt used for deterministic implementation deployment.
     function upgradeBeacon(address beacon, string memory artifactPath, bytes memory constructorArgs, bytes32 salt)
         internal
     {
         upgradeBeacon({beacon: beacon, implementation: vm.deployCode(artifactPath, constructorArgs, salt)});
+    }
+
+    /// @notice Upgrades the beacon to the given implementation.
+    /// @dev Overload of {upgradeBeacon} that attempts the upgrade as `msgSender`.
+    ///      `msgSender` must be the owner of the beacon.
+    /// @param beacon The address of the beacon to upgrade.
+    /// @param implementation The address of the new implementation to set in the beacon.
+    /// @param msgSender The address to impersonate as `msg.sender`.
+    function upgradeBeacon(address beacon, address implementation, address msgSender) internal tryPrank(msgSender) {
+        upgradeBeacon(beacon, implementation);
+    }
+
+    /// @notice Deploys a new implementation, then upgrades the beacon to it.
+    /// @dev Overload of {upgradeBeacon} that attempts the upgrade as `msgSender`.
+    /// @param beacon The address of the beacon to upgrade.
+    /// @param artifactPath The Foundry artifact identifier for the new implementation.
+    /// @param msgSender The address to impersonate as `msg.sender`.
+    function upgradeBeacon(address beacon, string memory artifactPath, address msgSender) internal tryPrank(msgSender) {
+        upgradeBeacon({beacon: beacon, artifactPath: artifactPath, constructorArgs: ""});
+    }
+
+    /// @notice Deploys a new implementation, then upgrades the beacon to it.
+    /// @dev Overload of {upgradeBeacon} that attempts the upgrade as `msgSender`.
+    /// @param beacon The address of the beacon to upgrade.
+    /// @param artifactPath The Foundry artifact identifier for the new implementation.
+    /// @param constructorArgs The ABI-encoded constructor arguments for the new implementation.
+    /// @param msgSender The address to impersonate as `msg.sender`.
+    function upgradeBeacon(address beacon, string memory artifactPath, bytes memory constructorArgs, address msgSender)
+        internal
+        tryPrank(msgSender)
+    {
+        upgradeBeacon({beacon: beacon, artifactPath: artifactPath, constructorArgs: constructorArgs});
+    }
+
+    /// @notice Deterministically deploys a new implementation, then upgrades the beacon to it.
+    /// @dev Overload of {upgradeBeacon} that attempts the upgrade as `msgSender`.
+    /// @param beacon The address of the beacon to upgrade.
+    /// @param artifactPath The Foundry artifact identifier for the new implementation.
+    /// @param salt The salt used for deterministic implementation deployment.
+    /// @param msgSender The address to impersonate as `msg.sender`.
+    function upgradeBeacon(address beacon, string memory artifactPath, bytes32 salt, address msgSender)
+        internal
+        tryPrank(msgSender)
+    {
+        upgradeBeacon({beacon: beacon, artifactPath: artifactPath, constructorArgs: "", salt: salt});
+    }
+
+    /// @notice Deterministically deploys a new implementation, then upgrades the beacon to it.
+    /// @dev Overload of {upgradeBeacon} that attempts the upgrade as `msgSender`.
+    /// @param beacon The address of the beacon to upgrade.
+    /// @param artifactPath The Foundry artifact identifier for the new implementation.
+    /// @param constructorArgs The ABI-encoded constructor arguments for the new implementation.
+    /// @param salt The salt used for deterministic implementation deployment.
+    /// @param msgSender The address to impersonate as `msg.sender`.
+    function upgradeBeacon(
+        address beacon,
+        string memory artifactPath,
+        bytes memory constructorArgs,
+        bytes32 salt,
+        address msgSender
+    ) internal tryPrank(msgSender) {
+        upgradeBeacon({beacon: beacon, artifactPath: artifactPath, constructorArgs: constructorArgs, salt: salt});
     }
 
     /// @notice Returns the address of the implementation stored in the proxy.
@@ -1288,14 +1749,15 @@ library Proxify {
                 revert(ptr, returndatasize())
             }
 
-            implementation := mload(0x00)
+            implementation := shr(0x60, shl(0x60, mload(0x00)))
         }
     }
 
-    /// @notice Returns the upgrade interface version string exposed by the upgrade interface contract.
-    /// @dev Calls the `UPGRADE_INTERFACE_VERSION()` getter on the proxy or admin and returns the decoded string
-    ///      when the call succeeds and the response has the expected ABI layout, or an empty string otherwise.
-    /// @param upgradeInterface The address of the upgrade interface to inspect.
+    /// @notice Returns the upgrade interface version exposed by the target.
+    /// @dev Calls the `UPGRADE_INTERFACE_VERSION()` getter on the proxy or admin and returns
+    ///      the decoded string when the call succeeds and the response has the expected
+    ///      ABI layout, or an empty string otherwise.
+    /// @param upgradeInterface The address of the proxy or admin to inspect.
     /// @return version The exposed upgrade interface version, or an empty string if unavailable.
     function getUpgradeInterfaceVersion(address upgradeInterface) internal view returns (string memory version) {
         assembly ("memory-safe") {
@@ -1430,7 +1892,7 @@ library Proxify {
                 revert(ptr, returndatasize())
             }
 
-            owner := mload(0x00)
+            owner := shr(0x60, shl(0x60, mload(0x00)))
         }
     }
 
