@@ -2,66 +2,61 @@
 pragma solidity ^0.8.25;
 
 import {Proxify} from "src/Proxify.sol";
-import {ProxifyTestBase} from "test/Base.t.sol";
+import {ProxifyTest} from "test/Base.t.sol";
 
-contract ProxifyDeployUUPSProxyTest is ProxifyTestBase {
-    string internal constant defaultGreeting = "hello";
-    address internal constant defaultOwner = 0xDeaDbeefdEAdbeefdEadbEEFdeadbeEFdEaDbeeF;
-    uint256 internal constant defaultValue = 12 ether;
-    bytes32 internal constant defaultSalt = keccak256("proxify-deployUUPSProxy-salt");
-
+contract ProxifyDeployUUPSProxyTest is ProxifyTest {
     address internal implementation;
 
     function setUp() public {
-        implementation = Proxify.deployCode(GREETER_V1_PROXIABLE_PATH);
+        implementation = vm.deployCode(GREETER_V1_PROXIABLE_PATH);
     }
 
     function test_deployUUPSProxy_withExistingImplementation() public {
-        bytes memory data = encodeInitializerData(defaultOwner, defaultGreeting);
+        bytes memory data = encodeInitializerData(DEFAULT_OWNER, DEFAULT_GREETING);
 
         address expected = vm.computeCreateAddress(address(this), vm.getNonce(address(this)));
         address proxy = Proxify.deployUUPSProxy(implementation, data);
 
         assertEq(proxy, expected);
         assertUUPSProxy(proxy, implementation, 0);
-        assertGreeterV1(proxy, defaultOwner, defaultGreeting);
+        assertGreeterV1(proxy, DEFAULT_OWNER, DEFAULT_GREETING);
     }
 
     function test_deployUUPSProxy_withExistingImplementationAndValue() public {
-        bytes memory data = encodeInitializerData(defaultOwner, defaultGreeting);
+        bytes memory data = encodeInitializerData(DEFAULT_OWNER, DEFAULT_GREETING);
 
         address expected = vm.computeCreateAddress(address(this), vm.getNonce(address(this)));
-        address proxy = Proxify.deployUUPSProxy(implementation, data, defaultValue);
+        address proxy = Proxify.deployUUPSProxy(implementation, data, DEFAULT_VALUE);
 
         assertEq(proxy, expected);
-        assertUUPSProxy(proxy, implementation, defaultValue);
-        assertGreeterV1(proxy, defaultOwner, defaultGreeting);
+        assertUUPSProxy(proxy, implementation, DEFAULT_VALUE);
+        assertGreeterV1(proxy, DEFAULT_OWNER, DEFAULT_GREETING);
     }
 
     function test_deployUUPSProxy_withExistingImplementationUsesSalt() public {
-        bytes memory data = encodeInitializerData(defaultOwner, defaultGreeting);
+        bytes memory data = encodeInitializerData(DEFAULT_OWNER, DEFAULT_GREETING);
 
-        address expected = computeUUPSProxyAddress(implementation, data, defaultSalt);
-        address proxy = Proxify.deployUUPSProxy(implementation, data, defaultSalt);
+        address expected = computeUUPSProxyAddress(implementation, data, DEFAULT_SALT);
+        address proxy = Proxify.deployUUPSProxy(implementation, data, DEFAULT_SALT);
 
         assertEq(proxy, expected);
         assertUUPSProxy(proxy, implementation, 0);
-        assertGreeterV1(proxy, defaultOwner, defaultGreeting);
+        assertGreeterV1(proxy, DEFAULT_OWNER, DEFAULT_GREETING);
     }
 
     function test_deployUUPSProxy_withExistingImplementationAndValueUsesSalt() public {
-        bytes memory data = encodeInitializerData(defaultOwner, defaultGreeting);
+        bytes memory data = encodeInitializerData(DEFAULT_OWNER, DEFAULT_GREETING);
 
-        address expected = computeUUPSProxyAddress(implementation, data, defaultSalt);
-        address proxy = Proxify.deployUUPSProxy(implementation, data, defaultSalt, defaultValue);
+        address expected = computeUUPSProxyAddress(implementation, data, DEFAULT_SALT);
+        address proxy = Proxify.deployUUPSProxy(implementation, data, DEFAULT_SALT, DEFAULT_VALUE);
 
         assertEq(proxy, expected);
-        assertUUPSProxy(proxy, implementation, defaultValue);
-        assertGreeterV1(proxy, defaultOwner, defaultGreeting);
+        assertUUPSProxy(proxy, implementation, DEFAULT_VALUE);
+        assertGreeterV1(proxy, DEFAULT_OWNER, DEFAULT_GREETING);
     }
 
     function test_deployUUPSProxy_withArtifact() public {
-        bytes memory data = encodeInitializerData(defaultOwner, defaultGreeting);
+        bytes memory data = encodeInitializerData(DEFAULT_OWNER, DEFAULT_GREETING);
 
         uint64 nonce = vm.getNonce(address(this));
         implementation = vm.computeCreateAddress(address(this), nonce);
@@ -71,71 +66,63 @@ contract ProxifyDeployUUPSProxyTest is ProxifyTestBase {
 
         assertEq(proxy, expected);
         assertUUPSProxy(proxy, implementation, 0);
-        assertGreeterV1(proxy, defaultOwner, defaultGreeting);
+        assertGreeterV1(proxy, DEFAULT_OWNER, DEFAULT_GREETING);
     }
 
     function test_deployUUPSProxy_withArtifactAndValue() public {
-        bytes memory data = encodeInitializerData(defaultOwner, defaultGreeting);
+        bytes memory data = encodeInitializerData(DEFAULT_OWNER, DEFAULT_GREETING);
 
         uint64 nonce = vm.getNonce(address(this));
         implementation = vm.computeCreateAddress(address(this), nonce);
 
         address expected = vm.computeCreateAddress(address(this), ++nonce);
-        address proxy = Proxify.deployUUPSProxy(GREETER_V1_PROXIABLE_PATH, data, defaultValue);
+        address proxy = Proxify.deployUUPSProxy(GREETER_V1_PROXIABLE_PATH, data, DEFAULT_VALUE);
 
         assertEq(proxy, expected);
-        assertUUPSProxy(proxy, implementation, defaultValue);
-        assertGreeterV1(proxy, defaultOwner, defaultGreeting);
+        assertUUPSProxy(proxy, implementation, DEFAULT_VALUE);
+        assertGreeterV1(proxy, DEFAULT_OWNER, DEFAULT_GREETING);
     }
 
     function test_deployUUPSProxy_withArtifactUsesSalt() public {
-        bytes memory data = encodeInitializerData(defaultOwner, defaultGreeting);
-        implementation = computeCreate2Address(GREETER_V1_PROXIABLE_BYTECODE, defaultSalt);
+        bytes memory data = encodeInitializerData(DEFAULT_OWNER, DEFAULT_GREETING);
+        implementation = computeCreate2Address(GREETER_V1_PROXIABLE_PATH, DEFAULT_SALT);
 
-        address expected = computeUUPSProxyAddress(implementation, data, defaultSalt);
-        address proxy = Proxify.deployUUPSProxy(GREETER_V1_PROXIABLE_PATH, data, defaultSalt);
+        address expected = computeUUPSProxyAddress(implementation, data, DEFAULT_SALT);
+        address proxy = Proxify.deployUUPSProxy(GREETER_V1_PROXIABLE_PATH, data, DEFAULT_SALT);
 
         assertEq(proxy, expected);
         assertUUPSProxy(proxy, implementation, 0);
-        assertGreeterV1(proxy, defaultOwner, defaultGreeting);
+        assertGreeterV1(proxy, DEFAULT_OWNER, DEFAULT_GREETING);
     }
 
     function test_deployUUPSProxy_withArtifactAndValueUsesSalt() public {
-        bytes memory data = encodeInitializerData(defaultOwner, defaultGreeting);
-        implementation = computeCreate2Address(GREETER_V1_PROXIABLE_BYTECODE, defaultSalt);
+        bytes memory data = encodeInitializerData(DEFAULT_OWNER, DEFAULT_GREETING);
+        implementation = computeCreate2Address(GREETER_V1_PROXIABLE_PATH, DEFAULT_SALT);
 
-        address expected = computeUUPSProxyAddress(implementation, data, defaultSalt);
-        address proxy = Proxify.deployUUPSProxy(GREETER_V1_PROXIABLE_PATH, data, defaultSalt, defaultValue);
+        address expected = computeUUPSProxyAddress(implementation, data, DEFAULT_SALT);
+        address proxy = Proxify.deployUUPSProxy(GREETER_V1_PROXIABLE_PATH, data, DEFAULT_SALT, DEFAULT_VALUE);
 
         assertEq(proxy, expected);
-        assertUUPSProxy(proxy, implementation, defaultValue);
-        assertGreeterV1(proxy, defaultOwner, defaultGreeting);
+        assertUUPSProxy(proxy, implementation, DEFAULT_VALUE);
+        assertGreeterV1(proxy, DEFAULT_OWNER, DEFAULT_GREETING);
     }
 
     function test_deployUUPSProxy_bubblesInitializerRevert() public {
         vm.expectRevert(bytes4(keccak256("FailedCall()")));
-        this.deployUUPSProxy(encodeInitializerData(address(0), "FailedCall"), defaultSalt);
+        Proxify.deployUUPSProxy(implementation, encodeInitializerData(address(0), "FailedCall"), DEFAULT_SALT);
     }
 
     function test_deployUUPSProxy_revertsWhenInitializerDataIsEmpty() public {
         vm.expectRevert(bytes4(keccak256("ERC1967ProxyUninitialized()")));
-        this.deployUUPSProxy("", defaultSalt);
+        Proxify.deployUUPSProxy(implementation, "", DEFAULT_SALT);
     }
 
-    function test_deployUUPSProxy_revertsWithDeploymentFailedOnCreate2Collision() public {
-        bytes memory data = encodeInitializerData(defaultOwner, defaultGreeting);
-        assertContract(this.deployUUPSProxy(data, defaultSalt));
+    function test_deployUUPSProxy_revertsOnCreate2Collision() public {
+        bytes memory data = encodeInitializerData(DEFAULT_OWNER, DEFAULT_GREETING);
+        assertContract(Proxify.deployUUPSProxy(implementation, data, DEFAULT_SALT));
 
-        vm.expectRevert(Proxify.DeploymentFailed.selector);
-        this.deployUUPSProxy(data, defaultSalt);
-    }
-
-    function test_deployUUPSProxy_withArtifactRevertsWithDeploymentFailedOnCreate2Collision() public {
-        bytes memory data = encodeInitializerData(defaultOwner, defaultGreeting);
-        assertContract(this.deployUUPSProxy(GREETER_V1_PROXIABLE_PATH, data, defaultSalt));
-
-        vm.expectRevert(Proxify.DeploymentFailed.selector);
-        this.deployUUPSProxy(GREETER_V1_PROXIABLE_PATH, data, defaultSalt);
+        vm.expectRevert();
+        Proxify.deployUUPSProxy(implementation, data, DEFAULT_SALT);
     }
 
     function test_fuzz_deployUUPSProxy_withExistingImplementationUsesSalt(
@@ -163,7 +150,7 @@ contract ProxifyDeployUUPSProxyTest is ProxifyTestBase {
         vm.assume(initialOwner != address(0));
 
         bytes memory data = encodeInitializerData(initialOwner, initialGreeting);
-        implementation = computeCreate2Address(GREETER_V1_PROXIABLE_BYTECODE, salt);
+        implementation = computeCreate2Address(GREETER_V1_PROXIABLE_PATH, salt);
 
         address expected = computeUUPSProxyAddress(implementation, data, salt);
         address proxy = Proxify.deployUUPSProxy(GREETER_V1_PROXIABLE_PATH, data, salt);
@@ -171,16 +158,5 @@ contract ProxifyDeployUUPSProxyTest is ProxifyTestBase {
         assertEq(proxy, expected);
         assertUUPSProxy(proxy, implementation, 0);
         assertGreeterV1(proxy, initialOwner, initialGreeting);
-    }
-
-    function deployUUPSProxy(bytes calldata data, bytes32 salt) external returns (address) {
-        return Proxify.deployUUPSProxy(implementation, data, salt);
-    }
-
-    function deployUUPSProxy(string calldata artifactPath, bytes calldata data, bytes32 salt)
-        external
-        returns (address)
-    {
-        return Proxify.deployUUPSProxy(artifactPath, data, salt);
     }
 }

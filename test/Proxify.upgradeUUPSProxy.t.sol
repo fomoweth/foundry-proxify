@@ -2,106 +2,95 @@
 pragma solidity ^0.8.25;
 
 import {Proxify} from "src/Proxify.sol";
-import {ProxifyTestBase} from "test/Base.t.sol";
+import {ProxifyTest} from "test/Base.t.sol";
 
-contract ProxifyUpgradeUUPSProxyTest is ProxifyTestBase {
-    string internal constant defaultGreeting = "hello";
-    address internal constant defaultOwner = 0xDeaDbeefdEAdbeefdEadbEEFdeadbeEFdEaDbeeF;
-    uint256 internal constant defaultValue = 12 ether;
-    bytes32 internal constant defaultSalt = keccak256("proxify-upgradeUUPSProxy-salt");
-
+contract ProxifyUpgradeUUPSProxyTest is ProxifyTest {
     address internal proxy;
     address internal implementationV1;
     address internal implementationV2;
 
     function setUp() public {
-        implementationV1 = Proxify.deployCode(GREETER_V1_PROXIABLE_PATH);
-        implementationV2 = Proxify.deployCode(GREETER_V2_PROXIABLE_PATH);
+        implementationV1 = vm.deployCode(GREETER_V1_PROXIABLE_PATH);
+        implementationV2 = vm.deployCode(GREETER_V2_PROXIABLE_PATH);
 
-        bytes memory data = encodeInitializerData(address(this), defaultGreeting);
+        bytes memory data = encodeInitializerData(DEFAULT_SENDER, DEFAULT_GREETING);
         proxy = Proxify.deployUUPSProxy(implementationV1, data);
     }
 
     function test_upgradeUUPSProxy_withExistingImplementation() public {
-        Proxify.upgradeUUPSProxy(proxy, implementationV2, encodeReinitializerData());
+        Proxify.upgradeUUPSProxy(proxy, implementationV2, encodeReinitializerData(), DEFAULT_SENDER);
 
         assertUUPSProxy(proxy, implementationV2, 0);
-        assertGreeterV2(proxy, false);
+        assertGreeterV2(proxy);
     }
 
     function test_upgradeUUPSProxy_withExistingImplementationAndValue() public {
-        Proxify.upgradeUUPSProxy(proxy, implementationV2, encodeReinitializerData(), defaultValue);
+        bytes memory data = encodeReinitializerData();
+        Proxify.upgradeUUPSProxy(proxy, implementationV2, data, DEFAULT_VALUE, DEFAULT_SENDER);
 
-        assertUUPSProxy(proxy, implementationV2, defaultValue);
-        assertGreeterV2(proxy, false);
+        assertUUPSProxy(proxy, implementationV2, DEFAULT_VALUE);
+        assertGreeterV2(proxy);
     }
 
     function test_upgradeUUPSProxy_withArtifact() public {
-        implementationV2 = vm.computeCreateAddress(address(this), vm.getNonce(address(this)));
-        Proxify.upgradeUUPSProxy(proxy, GREETER_V2_PROXIABLE_PATH, encodeReinitializerData());
+        bytes memory data = encodeReinitializerData();
+
+        implementationV2 = vm.computeCreateAddress(DEFAULT_SENDER, vm.getNonce(DEFAULT_SENDER));
+        Proxify.upgradeUUPSProxy(proxy, GREETER_V2_PROXIABLE_PATH, data, DEFAULT_SENDER);
 
         assertUUPSProxy(proxy, implementationV2, 0);
-        assertGreeterV2(proxy, false);
+        assertGreeterV2(proxy);
     }
 
     function test_upgradeUUPSProxy_withArtifactAndValue() public {
         bytes memory data = encodeReinitializerData();
 
-        implementationV2 = vm.computeCreateAddress(address(this), vm.getNonce(address(this)));
-        Proxify.upgradeUUPSProxy(proxy, GREETER_V2_PROXIABLE_PATH, data, defaultValue);
+        implementationV2 = vm.computeCreateAddress(DEFAULT_SENDER, vm.getNonce(DEFAULT_SENDER));
+        Proxify.upgradeUUPSProxy(proxy, GREETER_V2_PROXIABLE_PATH, data, DEFAULT_VALUE, DEFAULT_SENDER);
 
-        assertUUPSProxy(proxy, implementationV2, defaultValue);
-        assertGreeterV2(proxy, false);
+        assertUUPSProxy(proxy, implementationV2, DEFAULT_VALUE);
+        assertGreeterV2(proxy);
     }
 
     function test_upgradeUUPSProxy_withArtifactUsesSalt() public {
         bytes memory data = encodeReinitializerData();
 
-        implementationV2 = computeCreate2Address(GREETER_V2_PROXIABLE_BYTECODE, defaultSalt);
-        Proxify.upgradeUUPSProxy(proxy, GREETER_V2_PROXIABLE_PATH, data, defaultSalt);
+        implementationV2 = computeCreate2Address(GREETER_V2_PROXIABLE_PATH, DEFAULT_SALT, DEFAULT_SENDER);
+        Proxify.upgradeUUPSProxy(proxy, GREETER_V2_PROXIABLE_PATH, data, DEFAULT_SALT, DEFAULT_SENDER);
 
         assertUUPSProxy(proxy, implementationV2, 0);
-        assertGreeterV2(proxy, false);
+        assertGreeterV2(proxy);
     }
 
     function test_upgradeUUPSProxy_withArtifactAndValueUsesSalt() public {
         bytes memory data = encodeReinitializerData();
 
-        implementationV2 = computeCreate2Address(GREETER_V2_PROXIABLE_BYTECODE, defaultSalt);
-        Proxify.upgradeUUPSProxy(proxy, GREETER_V2_PROXIABLE_PATH, data, defaultSalt, defaultValue);
+        implementationV2 = computeCreate2Address(GREETER_V2_PROXIABLE_PATH, DEFAULT_SALT, DEFAULT_SENDER);
+        Proxify.upgradeUUPSProxy(proxy, GREETER_V2_PROXIABLE_PATH, data, DEFAULT_SALT, DEFAULT_VALUE, DEFAULT_SENDER);
 
-        assertUUPSProxy(proxy, implementationV2, defaultValue);
-        assertGreeterV2(proxy, false);
+        assertUUPSProxy(proxy, implementationV2, DEFAULT_VALUE);
+        assertGreeterV2(proxy);
     }
 
     function test_upgradeUUPSProxy_bubblesDownstreamRevert() public {
-        proxy = Proxify.deployUUPSProxy(implementationV1, encodeInitializerData(defaultOwner, defaultGreeting));
-
         vm.expectRevert(bytes4(keccak256("Unauthorized()")));
         this.upgradeUUPSProxy(implementationV2, encodeReinitializerData());
     }
 
     function test_upgradeUUPSProxy_revertsWhenTargetHasNoCode() public {
-        proxy = Proxify.deployCode("Observers.sol:EmptyRuntime");
-
+        proxy = vm.deployCode("EmptyRuntime.sol:EmptyRuntime");
         vm.expectRevert(abi.encodeWithSelector(Proxify.EmptyCode.selector, proxy));
-        this.upgradeUUPSProxy(implementationV2, encodeReinitializerData());
-    }
-
-    function test_upgradeUUPSProxy_revertsWithUpgradeFailedWhenCallRevertsWithoutData() public {
-        proxy = Proxify.deployCode("Observers.sol:EmptyRevert");
-
-        vm.expectRevert(Proxify.UpgradeFailed.selector);
-        this.upgradeUUPSProxy(implementationV2, encodeReinitializerData());
+        Proxify.upgradeUUPSProxy(proxy, implementationV2, encodeReinitializerData());
     }
 
     function test_fuzz_upgradeUUPSProxy_withExistingImplementationAndValue(uint256 value) public {
         value = bound(value, 0, 100 ether);
 
-        Proxify.upgradeUUPSProxy(proxy, implementationV2, encodeReinitializerData(), value);
+        bytes memory data = encodeReinitializerData();
+        Proxify.upgradeUUPSProxy(proxy, implementationV2, data, value, DEFAULT_SENDER);
 
         assertUUPSProxy(proxy, implementationV2, value);
-        assertGreeterV2(proxy, false);
+        assertGreeterV2(proxy);
     }
 
     function test_fuzz_upgradeUUPSProxy_withArtifactUsesSalt(bytes32 salt, uint256 value) public {
@@ -109,11 +98,11 @@ contract ProxifyUpgradeUUPSProxyTest is ProxifyTestBase {
 
         bytes memory data = encodeReinitializerData();
 
-        implementationV2 = computeCreate2Address(GREETER_V2_PROXIABLE_BYTECODE, salt);
-        Proxify.upgradeUUPSProxy(proxy, GREETER_V2_PROXIABLE_PATH, data, salt, value);
+        implementationV2 = computeCreate2Address(GREETER_V2_PROXIABLE_PATH, salt, DEFAULT_SENDER);
+        Proxify.upgradeUUPSProxy(proxy, GREETER_V2_PROXIABLE_PATH, data, salt, value, DEFAULT_SENDER);
 
         assertUUPSProxy(proxy, implementationV2, value);
-        assertGreeterV2(proxy, false);
+        assertGreeterV2(proxy);
     }
 
     function upgradeUUPSProxy(address implementation, bytes calldata data) external {

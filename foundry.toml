@@ -4,6 +4,7 @@ out = "out"
 libs = ["lib"]
 evm_version = "cancun"
 fs_permissions = [{ access = "read", path = "./out" }]
+allow_internal_expect_revert = true
 
 [profile.default.fuzz]
 runs = 1_000

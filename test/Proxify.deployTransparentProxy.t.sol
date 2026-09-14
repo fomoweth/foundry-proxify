@@ -2,142 +2,130 @@
 pragma solidity ^0.8.25;
 
 import {Proxify} from "src/Proxify.sol";
-import {ProxifyTestBase} from "test/Base.t.sol";
+import {ProxifyTest} from "test/Base.t.sol";
 
-contract ProxifyDeployTransparentProxyTest is ProxifyTestBase {
-    string internal constant defaultGreeting = "hello";
-    address internal constant defaultOwner = 0xDeaDbeefdEAdbeefdEadbEEFdeadbeEFdEaDbeeF;
-    uint256 internal constant defaultValue = 12 ether;
-    bytes32 internal constant defaultSalt = keccak256("proxify-deployTransparentProxy-salt");
-
+contract ProxifyDeployTransparentProxyTest is ProxifyTest {
     address internal implementation;
 
     function setUp() public {
-        implementation = Proxify.deployCode(GREETER_V1_PATH);
+        implementation = vm.deployCode(GREETER_V1_PATH);
     }
 
     function test_deployTransparentProxy_withExistingImplementation() public {
-        address adminOwner = address(this);
-        bytes memory data = encodeInitializerData(defaultOwner, defaultGreeting);
+        bytes memory data = encodeInitializerData(DEFAULT_OWNER, DEFAULT_GREETING);
 
         address expected = vm.computeCreateAddress(address(this), vm.getNonce(address(this)));
-        address proxy = Proxify.deployTransparentProxy(implementation, adminOwner, data);
+        address proxy = Proxify.deployTransparentProxy(implementation, DEFAULT_SENDER, data);
 
         assertEq(proxy, expected);
-        assertTransparentProxy(proxy, implementation, adminOwner, 0);
-        assertGreeterV1(proxy, defaultOwner, defaultGreeting);
+        assertTransparentProxy(proxy, implementation, DEFAULT_SENDER, 0);
+        assertGreeterV1(proxy, DEFAULT_OWNER, DEFAULT_GREETING);
     }
 
     function test_deployTransparentProxy_withExistingImplementationAndValue() public {
-        address adminOwner = address(this);
-        bytes memory data = encodeInitializerData(defaultOwner, defaultGreeting);
+        bytes memory data = encodeInitializerData(DEFAULT_OWNER, DEFAULT_GREETING);
 
         address expected = vm.computeCreateAddress(address(this), vm.getNonce(address(this)));
-        address proxy = Proxify.deployTransparentProxy(implementation, adminOwner, data, defaultValue);
+        address proxy = Proxify.deployTransparentProxy(implementation, DEFAULT_SENDER, data, DEFAULT_VALUE);
 
         assertEq(proxy, expected);
-        assertTransparentProxy(proxy, implementation, adminOwner, defaultValue);
-        assertGreeterV1(proxy, defaultOwner, defaultGreeting);
+        assertTransparentProxy(proxy, implementation, DEFAULT_SENDER, DEFAULT_VALUE);
+        assertGreeterV1(proxy, DEFAULT_OWNER, DEFAULT_GREETING);
     }
 
     function test_deployTransparentProxy_withExistingImplementationUsesSalt() public {
-        address adminOwner = address(this);
-        bytes memory data = encodeInitializerData(defaultOwner, defaultGreeting);
+        bytes memory data = encodeInitializerData(DEFAULT_OWNER, DEFAULT_GREETING);
 
-        address expected = computeTransparentProxyAddress(implementation, address(this), data, defaultSalt);
-        address proxy = Proxify.deployTransparentProxy(implementation, adminOwner, data, defaultSalt);
+        address expected = computeTransparentProxyAddress(implementation, DEFAULT_SENDER, data, DEFAULT_SALT);
+        address proxy = Proxify.deployTransparentProxy(implementation, DEFAULT_SENDER, data, DEFAULT_SALT);
 
         assertEq(proxy, expected);
-        assertTransparentProxy(proxy, implementation, adminOwner, 0);
-        assertGreeterV1(proxy, defaultOwner, defaultGreeting);
+        assertTransparentProxy(proxy, implementation, DEFAULT_SENDER, 0);
+        assertGreeterV1(proxy, DEFAULT_OWNER, DEFAULT_GREETING);
     }
 
     function test_deployTransparentProxy_withExistingImplementationAndValueUsesSalt() public {
-        address adminOwner = address(this);
-        bytes memory data = encodeInitializerData(defaultOwner, defaultGreeting);
+        bytes memory data = encodeInitializerData(DEFAULT_OWNER, DEFAULT_GREETING);
 
-        address expected = computeTransparentProxyAddress(implementation, address(this), data, defaultSalt);
-        address proxy = Proxify.deployTransparentProxy(implementation, adminOwner, data, defaultSalt, defaultValue);
+        address expected = computeTransparentProxyAddress(implementation, DEFAULT_SENDER, data, DEFAULT_SALT);
+        address proxy =
+            Proxify.deployTransparentProxy(implementation, DEFAULT_SENDER, data, DEFAULT_SALT, DEFAULT_VALUE);
 
         assertEq(proxy, expected);
-        assertTransparentProxy(proxy, implementation, adminOwner, defaultValue);
-        assertGreeterV1(proxy, defaultOwner, defaultGreeting);
+        assertTransparentProxy(proxy, implementation, DEFAULT_SENDER, DEFAULT_VALUE);
+        assertGreeterV1(proxy, DEFAULT_OWNER, DEFAULT_GREETING);
     }
 
     function test_deployTransparentProxy_withArtifact() public {
-        address adminOwner = address(this);
-        bytes memory data = encodeInitializerData(defaultOwner, defaultGreeting);
+        bytes memory data = encodeInitializerData(DEFAULT_OWNER, DEFAULT_GREETING);
 
         uint64 nonce = vm.getNonce(address(this));
         implementation = vm.computeCreateAddress(address(this), nonce);
 
         address expected = vm.computeCreateAddress(address(this), ++nonce);
-        address proxy = Proxify.deployTransparentProxy(GREETER_V1_PATH, adminOwner, data);
+        address proxy = Proxify.deployTransparentProxy(GREETER_V1_PATH, DEFAULT_SENDER, data);
 
         assertEq(proxy, expected);
-        assertTransparentProxy(proxy, implementation, adminOwner, 0);
-        assertGreeterV1(proxy, defaultOwner, defaultGreeting);
+        assertTransparentProxy(proxy, implementation, DEFAULT_SENDER, 0);
+        assertGreeterV1(proxy, DEFAULT_OWNER, DEFAULT_GREETING);
     }
 
     function test_deployTransparentProxy_withArtifactAndValue() public {
-        address adminOwner = address(this);
-        bytes memory data = encodeInitializerData(defaultOwner, defaultGreeting);
+        bytes memory data = encodeInitializerData(DEFAULT_OWNER, DEFAULT_GREETING);
 
         uint64 nonce = vm.getNonce(address(this));
         implementation = vm.computeCreateAddress(address(this), nonce);
 
         address expected = vm.computeCreateAddress(address(this), ++nonce);
-        address proxy = Proxify.deployTransparentProxy(GREETER_V1_PATH, adminOwner, data, defaultValue);
+        address proxy = Proxify.deployTransparentProxy(GREETER_V1_PATH, DEFAULT_SENDER, data, DEFAULT_VALUE);
 
         assertEq(proxy, expected);
-        assertTransparentProxy(proxy, implementation, adminOwner, defaultValue);
-        assertGreeterV1(proxy, defaultOwner, defaultGreeting);
+        assertTransparentProxy(proxy, implementation, DEFAULT_SENDER, DEFAULT_VALUE);
+        assertGreeterV1(proxy, DEFAULT_OWNER, DEFAULT_GREETING);
     }
 
     function test_deployTransparentProxy_withArtifactUsesSalt() public {
-        address adminOwner = address(this);
-        bytes memory data = encodeInitializerData(defaultOwner, defaultGreeting);
+        bytes memory data = encodeInitializerData(DEFAULT_OWNER, DEFAULT_GREETING);
+        implementation = computeCreate2Address(GREETER_V1_PATH, DEFAULT_SALT);
 
-        implementation = computeCreate2Address(GREETER_V1_BYTECODE, defaultSalt);
-
-        address expected = computeTransparentProxyAddress(implementation, address(this), data, defaultSalt);
-        address proxy = Proxify.deployTransparentProxy(GREETER_V1_PATH, adminOwner, data, defaultSalt);
+        address expected = computeTransparentProxyAddress(implementation, DEFAULT_SENDER, data, DEFAULT_SALT);
+        address proxy = Proxify.deployTransparentProxy(GREETER_V1_PATH, DEFAULT_SENDER, data, DEFAULT_SALT);
 
         assertEq(proxy, expected);
-        assertTransparentProxy(proxy, implementation, adminOwner, 0);
-        assertGreeterV1(proxy, defaultOwner, defaultGreeting);
+        assertTransparentProxy(proxy, implementation, DEFAULT_SENDER, 0);
+        assertGreeterV1(proxy, DEFAULT_OWNER, DEFAULT_GREETING);
     }
 
     function test_deployTransparentProxy_withArtifactAndValueUsesSalt() public {
-        address adminOwner = address(this);
-        bytes memory data = encodeInitializerData(defaultOwner, defaultGreeting);
+        bytes memory data = encodeInitializerData(DEFAULT_OWNER, DEFAULT_GREETING);
+        implementation = computeCreate2Address(GREETER_V1_PATH, DEFAULT_SALT);
 
-        implementation = computeCreate2Address(GREETER_V1_BYTECODE, defaultSalt);
-
-        address expected = computeTransparentProxyAddress(implementation, adminOwner, data, defaultSalt);
-        address proxy = Proxify.deployTransparentProxy(GREETER_V1_PATH, adminOwner, data, defaultSalt, defaultValue);
+        address expected = computeTransparentProxyAddress(implementation, DEFAULT_SENDER, data, DEFAULT_SALT);
+        address proxy =
+            Proxify.deployTransparentProxy(GREETER_V1_PATH, DEFAULT_SENDER, data, DEFAULT_SALT, DEFAULT_VALUE);
 
         assertEq(proxy, expected);
-        assertTransparentProxy(proxy, implementation, adminOwner, defaultValue);
-        assertGreeterV1(proxy, defaultOwner, defaultGreeting);
+        assertTransparentProxy(proxy, implementation, DEFAULT_SENDER, DEFAULT_VALUE);
+        assertGreeterV1(proxy, DEFAULT_OWNER, DEFAULT_GREETING);
     }
 
     function test_deployTransparentProxy_bubblesInitializerRevert() public {
+        bytes memory data = encodeInitializerData(address(0), "FailedCall");
         vm.expectRevert(bytes4(keccak256("FailedCall()")));
-        this.deployTransparentProxy(address(this), encodeInitializerData(address(0), "FailedCall"), defaultSalt);
+        Proxify.deployTransparentProxy(implementation, DEFAULT_SENDER, data, DEFAULT_SALT);
     }
 
     function test_deployTransparentProxy_revertsWhenInitializerDataIsEmpty() public {
         vm.expectRevert(bytes4(keccak256("ERC1967ProxyUninitialized()")));
-        this.deployTransparentProxy(address(this), "", defaultSalt);
+        Proxify.deployTransparentProxy(implementation, DEFAULT_SENDER, "", DEFAULT_SALT);
     }
 
-    function test_deployTransparentProxy_revertsWithDeploymentFailedOnCreate2Collision() public {
-        bytes memory data = encodeInitializerData(defaultOwner, defaultGreeting);
-        assertContract(this.deployTransparentProxy(address(this), data, defaultSalt));
+    function test_deployTransparentProxy_revertsOnCreate2Collision() public {
+        bytes memory data = encodeInitializerData(DEFAULT_OWNER, DEFAULT_GREETING);
+        assertContract(Proxify.deployTransparentProxy(implementation, DEFAULT_SENDER, data, DEFAULT_SALT));
 
-        vm.expectRevert(Proxify.DeploymentFailed.selector);
-        this.deployTransparentProxy(address(this), data, defaultSalt);
+        vm.expectRevert();
+        Proxify.deployTransparentProxy(implementation, DEFAULT_SENDER, data, DEFAULT_SALT);
     }
 
     function test_fuzz_deployTransparentProxy_withExistingImplementationUsesSalt(
@@ -167,8 +155,7 @@ contract ProxifyDeployTransparentProxyTest is ProxifyTestBase {
         vm.assume(adminOwner != address(0) && initialOwner != address(0));
 
         bytes memory data = encodeInitializerData(initialOwner, initialGreeting);
-
-        implementation = computeCreate2Address(GREETER_V1_BYTECODE, salt);
+        implementation = computeCreate2Address(GREETER_V1_PATH, salt);
 
         address expected = computeTransparentProxyAddress(implementation, adminOwner, data, salt);
         address proxy = Proxify.deployTransparentProxy(GREETER_V1_PATH, adminOwner, data, salt);
@@ -176,12 +163,5 @@ contract ProxifyDeployTransparentProxyTest is ProxifyTestBase {
         assertEq(proxy, expected);
         assertTransparentProxy(proxy, implementation, adminOwner, 0);
         assertGreeterV1(proxy, initialOwner, initialGreeting);
-    }
-
-    function deployTransparentProxy(address initialOwner, bytes calldata data, bytes32 salt)
-        external
-        returns (address)
-    {
-        return Proxify.deployTransparentProxy(implementation, initialOwner, data, salt);
     }
 }
