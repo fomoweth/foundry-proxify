@@ -1,10 +1,30 @@
 # foundry-proxify
 
 [![Test](https://github.com/fomoweth/foundry-proxify/actions/workflows/test.yml/badge.svg)](https://github.com/fomoweth/foundry-proxify/actions/workflows/test.yml)
-[![Solidity](https://img.shields.io/badge/solidity-%5E0.8.25-2b247c)](https://docs.soliditylang.org/en/v0.8.25)
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](https://opensource.org/licenses/MIT)
+[![Docs](https://img.shields.io/badge/Docs-online-blue)](https://fomoweth.github.io/foundry-proxify)
+[![Solidity](https://img.shields.io/badge/Solidity-%5E0.8.25-2b247c)](https://docs.soliditylang.org/en/v0.8.25)
+[![License: MIT](https://img.shields.io/badge/License-MIT-orange.svg)](https://opensource.org/licenses/MIT)
 
 > Foundry-native utilities for deploying, upgrading, and inspecting ERC-1967 proxies.
+
+## Table of Contents
+
+- [Overview](#overview)
+- [Features](#features)
+- [Requirements](#requirements)
+- [Installation](#installation)
+- [Usage](#usage)
+  - [UUPS Proxy](#uups-proxy)
+  - [Transparent Proxy](#transparent-proxy)
+  - [Beacon Proxy](#beacon-proxy)
+- [Testing Authorized Upgrades](#testing-authorized-upgrades)
+- [Inspection and Validation](#inspection-and-validation)
+- [Artifact Identifiers](#artifact-identifiers)
+- [Design Notes](#design-notes)
+- [API Reference](#api-reference)
+- [Scope and Limitations](#scope-and-limitations)
+- [Development](#development)
+- [License](#license)
 
 ## Overview
 
