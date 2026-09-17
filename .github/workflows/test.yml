@@ -1,7 +1,5 @@
 name: Test
 
-permissions: {}
-
 on:
   push:
     branches: [main]
