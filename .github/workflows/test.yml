@@ -12,18 +12,15 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
-env:
-  FOUNDRY_PROFILE: ci
-
 jobs:
-  check:
-    name: Foundry project
+  test:
+    name: Foundry build and test
     runs-on: ubuntu-latest
     permissions:
       contents: read
 
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
           submodules: recursive
@@ -31,7 +28,7 @@ jobs:
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@v1
         with:
-          version: v1.7.1
+          version: stable
 
       - name: Show Forge version
         run: forge --version
@@ -44,3 +41,5 @@ jobs:
 
       - name: Run Forge tests
         run: forge test -vvv
+        env:
+          FOUNDRY_PROFILE: ci
