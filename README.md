@@ -17,30 +17,30 @@
   - [UUPS Proxy](#uups-proxy)
   - [Transparent Proxy](#transparent-proxy)
   - [Beacon Proxy](#beacon-proxy)
-- [Testing Authorized Upgrades](#testing-authorized-upgrades)
-- [Inspection and Validation](#inspection-and-validation)
-- [Artifact Identifiers](#artifact-identifiers)
+  - [Deployment Inputs](#deployment-inputs)
+  - [Inspection](#inspection)
+  - [Validation](#validation)
+  - [Testing Authorized Upgrades](#testing-authorized-upgrades)
 - [Design Notes](#design-notes)
 - [API Reference](#api-reference)
-- [Scope and Limitations](#scope-and-limitations)
 - [Development](#development)
 - [License](#license)
 
 ## Overview
 
-Proxify is a lightweight Solidity library for deploying, upgrading, and inspecting ERC-1967 proxy infrastructure directly from Foundry scripts and tests.
+`Proxify` is a lightweight Solidity library for deploying, upgrading, and inspecting ERC-1967 proxy infrastructure directly from Foundry scripts and tests.
 
-It supports the UUPS, transparent, and beacon proxy patterns provided by OpenZeppelin Contracts v5, with utilities for deploying implementations from Foundry artifacts, deterministic deployment through CREATE2, forwarding Ether during deployment and upgrades, and validating resulting proxy state.
+It supports the UUPS, transparent, and beacon proxy patterns provided by OpenZeppelin Contracts v5, with utilities for deploying implementations from Foundry artifacts, deterministic deployment through `CREATE2`, forwarding Ether during deployment and upgrades, and validating resulting proxy state.
 
-Proxify is designed as a low-level deployment and management utility rather than a complete upgrade-safety framework. It operates directly on OpenZeppelin proxy contracts and ERC-1967 state while leaving concerns such as storage-layout compatibility and initializer safety to the surrounding development workflow.
+`Proxify` is designed as a low-level deployment and management utility. It operates directly on OpenZeppelin proxy contracts and ERC-1967 state while leaving concerns such as storage-layout compatibility and initializer safety to the surrounding development workflow.
 
 ## Features
 
-- **UUPS proxies** — Deploy and upgrade ERC-1967 proxies backed by `UUPSUpgradeable` implementations.
-- **Transparent proxies** — Deploy and upgrade OpenZeppelin transparent proxies and their associated `ProxyAdmin`.
-- **Beacon proxies** — Deploy and upgrade `UpgradeableBeacon` and `BeaconProxy` infrastructure.
+- **UUPS proxies** — Deploy and upgrade [`ERC1967Proxy`][oz-erc1967-proxy-url] infrastructure backed by [`UUPSUpgradeable`][oz-uups-upgradeable-url] implementations.
+- **Transparent proxies** — Deploy and upgrade [`TransparentUpgradeableProxy`][oz-transparent-upgradeable-proxy-url] infrastructure managed through [`ProxyAdmin`][oz-proxy-admin-url].
+- **Beacon proxies** — Deploy and upgrade [`UpgradeableBeacon`][oz-upgradeable-beacon-url] and [`BeaconProxy`][oz-beacon-proxy-url] infrastructure.
 - **Artifact deployment** — Deploy implementations directly from Foundry artifacts, with optional constructor arguments.
-- **Deterministic deployment** — Deploy implementations, proxies, and beacons through CREATE2.
+- **Deterministic deployment** — Deploy implementations, proxies, and beacons through `CREATE2`.
 - **Ether forwarding** — Forward `msg.value` during supported proxy deployments and upgrades.
 - **Authorized upgrade testing** — Execute upgrades under an impersonated `msg.sender` in Foundry tests.
 - **ERC-1967 inspection** — Read implementation, admin, and beacon state directly from ERC-1967 storage.
@@ -49,11 +49,11 @@ Proxify is designed as a low-level deployment and management utility rather than
 ## Requirements
 
 - [Foundry](https://getfoundry.sh/)
-- [OpenZeppelin Contracts v5](https://github.com/OpenZeppelin/openzeppelin-contracts)
+- [OpenZeppelin Contracts v5][oz-contracts-url]
 - Solidity `^0.8.25`
 - Cancun EVM or later
 
-> [!NOTE]
+> [!IMPORTANT]
 > `foundry-proxify` requires the Cancun EVM or later because its low-level upgrade helpers use the `MCOPY` opcode.
 
 ## Installation
@@ -70,7 +70,7 @@ Install OpenZeppelin Contracts v5 if it is not already available in your project
 forge install OpenZeppelin/openzeppelin-contracts
 ```
 
-Add the following remapping to `remappings.txt`:
+Add the following remapping to `foundry.toml` or `remappings.txt`:
 
 ```text
 foundry-proxify/=lib/foundry-proxify/src/
@@ -82,13 +82,21 @@ Then import `Proxify`:
 import {Proxify} from "foundry-proxify/Proxify.sol";
 ```
 
+> [!IMPORTANT]
+> Artifact-backed deployments require read access to the Foundry artifact output directory. Grant access by adding the following configuration to `foundry.toml`:
+>
+> ```toml
+> [profile.default]
+> fs_permissions = [{ access = "read", path = "./out" }]
+> ```
+
 ## Usage
 
 ### UUPS Proxy
 
 #### Deploy
 
-Deploy an ERC-1967 proxy backed by an existing `UUPSUpgradeable` implementation:
+Deploy an `ERC1967Proxy` backed by an existing `UUPSUpgradeable` implementation:
 
 ```solidity
 address proxy = Proxify.deployUUPSProxy(
@@ -109,7 +117,7 @@ address proxy = Proxify.deployUUPSProxy(
 
 #### Deploy from an Artifact
 
-Proxify can deploy the implementation directly from a Foundry artifact before deploying the proxy:
+`Proxify` can deploy the implementation directly from a Foundry artifact before deploying the proxy:
 
 ```solidity
 address proxy = Proxify.deployUUPSProxy(
@@ -130,7 +138,7 @@ address proxy = Proxify.deployUUPSProxy(
 
 #### Deterministic Deployment
 
-Pass a `bytes32` salt to deploy the proxy using CREATE2:
+Pass a `bytes32` salt to deploy the proxy using `CREATE2`:
 
 ```solidity
 address proxy = Proxify.deployUUPSProxy(
@@ -163,7 +171,7 @@ Proxify.upgradeUUPSProxy(
 );
 ```
 
-The upgrade is performed through `UUPSUpgradeable.upgradeToAndCall` and is subject to the authorization logic of the current implementation.
+The upgrade is performed through [`UUPSUpgradeable.upgradeToAndCall`](https://github.com/OpenZeppelin/openzeppelin-contracts/blob/1f2665e8d52677fd61f8daedc41ca77e1c64259d/contracts/proxy/utils/UUPSUpgradeable.sol#L88) and is subject to the authorization logic of the current implementation.
 
 A new implementation can also be deployed directly from an artifact before performing the upgrade:
 
@@ -175,7 +183,7 @@ Proxify.upgradeUUPSProxy(
 );
 ```
 
-Constructor arguments, CREATE2 deployment, and Ether forwarding are available through the corresponding overloads.
+Constructor arguments, `CREATE2` deployment, and Ether forwarding are available through the corresponding overloads.
 
 ### Transparent Proxy
 
@@ -206,7 +214,7 @@ address proxy = Proxify.deployTransparentProxy(
 
 #### Deploy from an Artifact
 
-Proxify can deploy the implementation directly from a Foundry artifact before deploying the proxy:
+`Proxify` can deploy the implementation directly from a Foundry artifact before deploying the proxy:
 
 ```solidity
 address proxy = Proxify.deployTransparentProxy(
@@ -229,7 +237,7 @@ address proxy = Proxify.deployTransparentProxy(
 
 #### Deterministic Deployment
 
-Pass a `bytes32` salt to deploy the proxy using CREATE2:
+Pass a `bytes32` salt to deploy the proxy using `CREATE2`:
 
 ```solidity
 address proxy = Proxify.deployTransparentProxy(
@@ -264,7 +272,7 @@ Proxify.upgradeTransparentProxy(
 );
 ```
 
-The upgrade is performed through the `ProxyAdmin` associated with the proxy and is subject to `ProxyAdmin` ownership authorization.
+The upgrade is performed through [`ProxyAdmin.upgradeAndCall`](https://github.com/OpenZeppelin/openzeppelin-contracts/blob/1f2665e8d52677fd61f8daedc41ca77e1c64259d/contracts/proxy/transparent/ProxyAdmin.sol#L38) on the `ProxyAdmin` associated with the proxy and is subject to its ownership authorization.
 
 A new implementation can also be deployed directly from an artifact before performing the upgrade:
 
@@ -276,7 +284,7 @@ Proxify.upgradeTransparentProxy(
 );
 ```
 
-Constructor arguments, CREATE2 deployment, and Ether forwarding are available through the corresponding overloads.
+Constructor arguments, `CREATE2` deployment, and Ether forwarding are available through the corresponding overloads.
 
 ### Beacon Proxy
 
@@ -316,7 +324,7 @@ address proxy = Proxify.deployBeaconProxy(
 
 #### Deploy from an Artifact
 
-Proxify can deploy an implementation directly from a Foundry artifact before deploying a beacon:
+`Proxify` can deploy an implementation directly from a Foundry artifact before deploying a beacon:
 
 ```solidity
 address beacon = Proxify.deployBeacon(
@@ -335,7 +343,7 @@ address beacon = Proxify.deployBeacon(
 );
 ```
 
-Proxify can also deploy the complete beacon proxy stack from an artifact:
+`Proxify` can also deploy the complete beacon proxy stack from an artifact:
 
 ```solidity
 address proxy = Proxify.deployBeaconProxy(
@@ -368,7 +376,7 @@ UpgradeableBeacon
 
 #### Deterministic Deployment
 
-Pass a `bytes32` salt to deploy a beacon or beacon proxy using CREATE2:
+Pass a `bytes32` salt to deploy a beacon or beacon proxy using `CREATE2`:
 
 ```solidity
 address beacon = Proxify.deployBeacon(
@@ -409,7 +417,7 @@ Proxify.upgradeBeacon(
 );
 ```
 
-The upgrade is performed through `UpgradeableBeacon.upgradeTo` and is subject to beacon ownership authorization.
+The upgrade is performed through [`UpgradeableBeacon.upgradeTo`](https://github.com/OpenZeppelin/openzeppelin-contracts/blob/1f2665e8d52677fd61f8daedc41ca77e1c64259d/contracts/proxy/beacon/UpgradeableBeacon.sol#L52) and is subject to beacon ownership authorization.
 
 A new implementation can also be deployed directly from an artifact before upgrading the beacon:
 
@@ -420,48 +428,70 @@ Proxify.upgradeBeacon(
 );
 ```
 
-Constructor arguments and CREATE2 deployment are available through the corresponding overloads.
+Constructor arguments and `CREATE2` deployment are available through the corresponding overloads.
 
 > [!IMPORTANT]
 > Upgrading a beacon changes the implementation used by every `BeaconProxy` that references it.
 
-## Testing Authorized Upgrades
+### Deployment Inputs
 
-Upgrade overloads accepting `msgSender` are intended for Foundry tests that need to exercise authorization logic under a specific caller.
+`Proxify` deployment functions accept inputs for resolving implementations, configuring implementation construction, and initializing newly deployed proxies.
+
+#### Artifact Identifiers
+
+Functions accepting `artifactPath` can deploy implementations directly from Foundry artifacts.
+
+Supported contract identifier formats include:
+
+```text
+"MyContract.sol:MyContract"
+"MyContract"
+"MyContract.sol:0.8.25"
+"MyContract:0.8.25"
+```
+
+Project-relative artifact paths are also supported.
+
+#### Constructor Arguments
+
+When an implementation requires constructor arguments, pass them as ABI-encoded `constructorArgs`:
 
 ```solidity
-Proxify.upgradeUUPSProxy(
-    proxy,
-    newImplementation,
-    upgradeData,
-    owner
+bytes memory constructorArgs = abi.encode(arg0, arg1);
+
+address proxy = Proxify.deployUUPSProxy(
+    "MyImplementation.sol:MyImplementation",
+    constructorArgs,
+    initializerData
 );
 ```
 
-These overloads attempt to execute the upgrade with `msg.sender` impersonated as `msgSender`.
+`constructorArgs` are appended to the implementation creation code and configure the implementation deployment itself.
 
-The required authorization depends on the proxy type:
+#### Initializer Data
 
-- **UUPS** — `msgSender` must satisfy the upgrade authorization enforced by the current implementation.
-- **Transparent** — `msgSender` must be the owner of the associated `ProxyAdmin`.
-- **Beacon** — `msgSender` must be the owner of the beacon.
-
-Artifact-backed upgrade overloads support the same pattern:
+Proxy deployments can execute initialization calldata against the implementation through the newly deployed proxy:
 
 ```solidity
-Proxify.upgradeUUPSProxy(
-    proxy,
-    "MyImplementationV2.sol:MyImplementationV2",
-    upgradeData,
-    owner
+bytes memory initializerData = abi.encodeCall(MyImplementation.initialize, (initialOwner));
+
+address proxy = Proxify.deployUUPSProxy(
+    implementation,
+    initializerData
 );
 ```
 
-The `msgSender` overloads are intended for tests rather than broadcast scripts. When broadcasting, configure the transaction sender through Foundry instead.
+`initializerData` is passed to the proxy during construction and executed against the implementation through `delegatecall`, initializing proxy storage rather than implementation storage.
 
-## Inspection and Validation
+When no initialization call is required, empty bytes can be supplied if permitted by the underlying proxy:
 
-Proxify provides lightweight utilities for inspecting ERC-1967 state and validating it against expected values.
+```solidity
+bytes memory initializerData = bytes("");
+```
+
+Whether empty `initializerData` is valid depends on the underlying proxy and deployment parameters. `Proxify` does not independently validate this condition and propagates any revert from the underlying proxy construction.
+
+`initializerData` is separate from `constructorArgs`, which configure the implementation contract when its creation code is deployed.
 
 ### Inspection
 
@@ -495,6 +525,11 @@ Inspect the upgrade interface version exposed by a proxy or admin:
 string memory version = Proxify.getUpgradeInterfaceVersion(target);
 ```
 
+Inspection helpers are intentionally lightweight. They read the requested ERC-1967 storage slot or contract getter without attempting to determine whether the supplied address represents a valid proxy, implementation, admin, or beacon.
+
+> [!NOTE]
+> For OpenZeppelin Contracts v5 transparent proxies, `getAdmin` reads the ERC-1967 admin slot, which is inspection state rather than the authoritative source of upgrade authority.
+
 ### Validation
 
 Validate proxy state against expected addresses:
@@ -512,57 +547,53 @@ Proxify.validateBeaconImplementation(beacon, expectedImplementation);
 Proxify.validateOwner(target, expectedOwner);
 ```
 
-### Inspection Semantics
-
-Inspection helpers are intentionally lightweight. They read the requested ERC-1967 storage slot or contract getter without attempting to determine whether the supplied address represents a valid proxy, implementation, admin, or beacon.
-
 Validation helpers compare the observed state against an expected value. They assert state equality rather than perform comprehensive proxy or upgrade-safety validation.
 
-> [!NOTE]
-> For OpenZeppelin Contracts v5 transparent proxies, `getAdmin` reads the ERC-1967 admin slot, which is inspection state rather than the authoritative source of upgrade authority.
+### Testing Authorized Upgrades
 
-## Artifact Identifiers
-
-Functions accepting `artifactPath` can deploy implementations directly from Foundry artifacts.
-
-Supported contract identifier formats include:
-
-```text
-MyContract.sol:MyContract
-MyContract
-MyContract.sol:0.8.18
-MyContract:0.8.18
-```
-
-Project-relative artifact paths are also supported.
-
-### Constructor Arguments
-
-When an implementation requires constructor arguments, pass them as ABI-encoded `constructorArgs`:
+Upgrade overloads accepting `msgSender` are intended for Foundry tests that need to exercise authorization logic under a specific caller.
 
 ```solidity
-bytes memory constructorArgs = abi.encode(arg0, arg1);
-
-address proxy = Proxify.deployUUPSProxy(
-    "MyImplementation.sol:MyImplementation",
-    constructorArgs,
-    initializerData
+Proxify.upgradeUUPSProxy(
+    proxy,
+    newImplementation,
+    upgradeData,
+    msgSender
 );
 ```
 
-`constructorArgs` are appended to the implementation creation code and configure the implementation deployment itself. They are separate from `initializerData`, which is executed through the proxy during proxy construction.
+These overloads attempt to impersonate `msgSender` as `msg.sender` while executing the upgrade.
 
-The same distinction applies to transparent and beacon proxy deployments.
+The required authorization depends on the proxy type:
+
+- **UUPS** — `msgSender` must satisfy the upgrade authorization enforced by the current implementation.
+- **Transparent** — `msgSender` must be the owner of the associated `ProxyAdmin`.
+- **Beacon** — `msgSender` must be the owner of the beacon.
+
+Artifact-backed upgrade overloads support the same pattern:
+
+```solidity
+Proxify.upgradeUUPSProxy(
+    proxy,
+    "MyImplementationV2.sol:MyImplementationV2",
+    upgradeData,
+    msgSender
+);
+```
+
+Corresponding overloads can also forward Ether as `msg.value` while executing the upgrade as `msgSender`.
+
+The `msgSender` overloads are intended for tests rather than broadcast scripts. When broadcasting, configure the transaction sender through Foundry instead.
 
 ## Design Notes
 
 ### OpenZeppelin Contracts v5
 
-Proxify targets the ERC-1967 proxy implementations provided by OpenZeppelin Contracts v5:
+`Proxify` targets the ERC-1967 proxy implementations provided by OpenZeppelin Contracts v5:
 
-- `ERC1967Proxy` with `UUPSUpgradeable`
-- `TransparentUpgradeableProxy` with `ProxyAdmin`
-- `UpgradeableBeacon` with `BeaconProxy`
+- [`ERC1967Proxy`][oz-erc1967-proxy-url] with [`UUPSUpgradeable`][oz-uups-upgradeable-url]
+- [`TransparentUpgradeableProxy`][oz-transparent-upgradeable-proxy-url] with [`ProxyAdmin`][oz-proxy-admin-url]
+- [`UpgradeableBeacon`][oz-upgradeable-beacon-url] with [`BeaconProxy`][oz-beacon-proxy-url]
 
 Deployment, upgrade, and authorization behavior follows the corresponding OpenZeppelin Contracts v5 semantics.
 
@@ -570,7 +601,7 @@ Deployment, upgrade, and authorization behavior follows the corresponding OpenZe
 
 `deployUUPSProxy` deploys an `ERC1967Proxy` backed by the supplied implementation but does not independently verify that the implementation exposes a valid UUPS upgrade mechanism.
 
-During an upgrade, UUPS compatibility is validated through OpenZeppelin's `UUPSUpgradeable` upgrade mechanism, including the ERC-1822 `proxiableUUID` check. Upgrade authorization remains the responsibility of the current implementation.
+During an upgrade, UUPS compatibility is validated through OpenZeppelin's `UUPSUpgradeable` upgrade mechanism, including the ERC-1822 [`proxiableUUID`](https://github.com/OpenZeppelin/openzeppelin-contracts/blob/1f2665e8d52677fd61f8daedc41ca77e1c64259d/contracts/proxy/utils/UUPSUpgradeable.sol#L74) check. Upgrade authorization remains the responsibility of the current implementation.
 
 ### Transparent Proxy Administration
 
@@ -578,11 +609,11 @@ OpenZeppelin Contracts v5 creates a dedicated `ProxyAdmin` during `TransparentUp
 
 The effective admin is retained immutably by `TransparentUpgradeableProxy`. The ERC-1967 admin slot is maintained for compatibility and inspection, but it is not the authoritative source of upgrade authority.
 
-Proxify follows the OpenZeppelin Contracts v5 construction semantics when interacting with the associated `ProxyAdmin`.
+`Proxify` follows the OpenZeppelin Contracts v5 construction semantics when interacting with the associated `ProxyAdmin`.
 
 ### Deterministic Deployment
 
-Proxify provides CREATE2 overloads for deterministic deployment of implementations, proxies, and beacons.
+`Proxify` provides `CREATE2` overloads for deterministic deployment of implementations, proxies, and beacons.
 
 Artifact-backed deployments intentionally reuse the same salt across the contracts created as part of the operation:
 
@@ -601,7 +632,7 @@ UpgradeableBeacon
 BeaconProxy
 ```
 
-CREATE2 addresses are derived from the deployer, salt, and init-code hash. Reusing a salt does not cause a collision as long as the resulting init-code hashes differ.
+`CREATE2` addresses are derived from the deployer, salt, and init code hash. Reusing a salt does not cause a collision as long as the resulting init code hashes differ.
 
 Constructor arguments and proxy configuration are part of the corresponding init code and therefore affect deterministic addresses.
 
@@ -609,7 +640,7 @@ Constructor arguments and proxy configuration are part of the corresponding init
 
 An `UpgradeableBeacon` stores a single implementation address shared by every `BeaconProxy` that references it.
 
-Upgrading a beacon therefore changes the implementation used by all associated beacon proxies. Proxify validates the resulting beacon implementation after an upgrade but does not perform per-proxy validation.
+Upgrading a beacon therefore changes the implementation used by all associated beacon proxies. `Proxify` validates the resulting beacon implementation after an upgrade but does not perform per-proxy validation.
 
 ### Ether Forwarding
 
@@ -617,19 +648,19 @@ Deployment and upgrade overloads accepting `value` forward Ether as `msg.value` 
 
 OpenZeppelin Contracts v5 determines whether the forwarded value is valid for the requested operation. In particular, initialization or upgrade calldata must be compatible with receiving the forwarded value.
 
-Proxify does not independently prevalidate these conditions and instead propagates the underlying revert when the operation is invalid.
+`Proxify` does not independently prevalidate these conditions and instead propagates the underlying revert when the operation is invalid.
 
-### Cancun Requirement
+### EVM Compatibility
 
-Proxify's low-level UUPS and transparent upgrade helpers use the `MCOPY` opcode introduced with the Cancun EVM upgrade.
+`Proxify`'s low-level UUPS and transparent upgrade helpers use [`MCOPY` (EIP-5656)](https://eips.ethereum.org/EIPS/eip-5656) for direct memory-to-memory copying.
 
-The execution environment must therefore support Cancun or later.
+The execution environment must therefore support Cancun EVM or later.
 
 ## API Reference
 
-The complete API reference, including all overloads and NatSpec documentation, is available in the generated documentation.
+The complete API reference, including all functions, overloads, and NatSpec documentation, is available in the generated documentation:
 
-[View the documentation](https://fomoweth.github.io/foundry-proxify/)
+[View the API documentation](https://fomoweth.github.io/foundry-proxify)
 
 Generate the documentation locally with:
 
@@ -637,27 +668,11 @@ Generate the documentation locally with:
 forge doc
 ```
 
-To build and serve it locally:
+To generate and serve it locally:
 
 ```bash
 forge doc --serve
 ```
-
-## Scope and Limitations
-
-Proxify is intentionally focused on deploying, upgrading, inspecting, and validating OpenZeppelin Contracts v5 ERC-1967 proxy infrastructure from Foundry scripts and tests.
-
-It does not provide:
-
-- Storage layout compatibility validation.
-- Initializer validation or initializer safety analysis.
-- Automated upgrade safety analysis.
-- Diamond proxy management.
-- ERC-1167 clone deployment or management.
-- CREATE3 deployment.
-- A replacement for the complete OpenZeppelin Upgrades toolchain.
-
-These concerns are intentionally kept outside the library's deployment and management scope.
 
 ## Development
 
@@ -678,7 +693,7 @@ forge build
 Run the test suite:
 
 ```bash
-forge test -vvv
+forge test
 ```
 
 Format the codebase:
@@ -687,12 +702,14 @@ Format the codebase:
 forge fmt
 ```
 
-Generate the documentation:
-
-```bash
-forge doc
-```
-
 ## License
 
 This project is licensed under the [MIT License](LICENSE).
+
+[oz-contracts-url]: https://github.com/OpenZeppelin/openzeppelin-contracts/tree/1f2665e8d52677fd61f8daedc41ca77e1c64259d
+[oz-erc1967-proxy-url]: https://github.com/OpenZeppelin/openzeppelin-contracts/blob/1f2665e8d52677fd61f8daedc41ca77e1c64259d/contracts/proxy/ERC1967/ERC1967Proxy.sol
+[oz-uups-upgradeable-url]: https://github.com/OpenZeppelin/openzeppelin-contracts/blob/1f2665e8d52677fd61f8daedc41ca77e1c64259d/contracts/proxy/utils/UUPSUpgradeable.sol
+[oz-transparent-upgradeable-proxy-url]: https://github.com/OpenZeppelin/openzeppelin-contracts/blob/1f2665e8d52677fd61f8daedc41ca77e1c64259d/contracts/proxy/transparent/TransparentUpgradeableProxy.sol
+[oz-proxy-admin-url]: https://github.com/OpenZeppelin/openzeppelin-contracts/blob/1f2665e8d52677fd61f8daedc41ca77e1c64259d/contracts/proxy/transparent/ProxyAdmin.sol
+[oz-upgradeable-beacon-url]: https://github.com/OpenZeppelin/openzeppelin-contracts/blob/1f2665e8d52677fd61f8daedc41ca77e1c64259d/contracts/proxy/beacon/UpgradeableBeacon.sol
+[oz-beacon-proxy-url]: https://github.com/OpenZeppelin/openzeppelin-contracts/blob/1f2665e8d52677fd61f8daedc41ca77e1c64259d/contracts/proxy/beacon/BeaconProxy.sol
