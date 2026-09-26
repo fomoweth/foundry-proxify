@@ -1,4 +1,4 @@
-name: Test
+name: Continuous Integration
 
 on:
   push:
@@ -11,8 +11,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  foundry-ci:
-    name: Foundry CI
-    uses: fomoweth/github-workflows/.github/workflows/foundry-ci.yml@feat/foundry-ci
+  ci:
+    name: CI
+    uses: fomoweth/github-workflows/.github/workflows/foundry-ci.yml@main
     with:
       foundry-profile: ci
