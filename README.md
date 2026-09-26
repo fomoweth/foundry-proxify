@@ -1,6 +1,6 @@
 # foundry-proxify
 
-[![Test](https://github.com/fomoweth/foundry-proxify/actions/workflows/test.yml/badge.svg)](https://github.com/fomoweth/foundry-proxify/actions/workflows/test.yml)
+[![CI](https://github.com/fomoweth/foundry-proxify/actions/workflows/ci.yml/badge.svg)](https://github.com/fomoweth/foundry-proxify/actions/workflows/ci.yml)
 [![Docs](https://img.shields.io/badge/Docs-online-blue)](https://fomoweth.github.io/foundry-proxify)
 [![Solidity](https://img.shields.io/badge/Solidity-%5E0.8.25-2b247c)](https://docs.soliditylang.org/en/v0.8.25)
 [![License: MIT](https://img.shields.io/badge/License-MIT-orange.svg)](https://opensource.org/licenses/MIT)
