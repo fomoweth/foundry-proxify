@@ -16,4 +16,4 @@ jobs:
       contents: read
       pages: write
       id-token: write
-    uses: fomoweth/github-workflows/.github/workflows/foundry-docs.yml@feat/foundry-docs
+    uses: fomoweth/github-workflows/.github/workflows/foundry-docs.yml@main
